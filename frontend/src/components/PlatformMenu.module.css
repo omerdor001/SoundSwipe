@@ -1,0 +1,83 @@
+/* src/components/PlatformMenu.module.css */
+.menu {
+  position: absolute;      /* positioned relative to .platformWrap */
+  width: 280px;
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.04);
+  z-index: 500;            /* above everything */
+  overflow: hidden;
+  animation: popIn .18s cubic-bezier(.34,1.56,.64,1);
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.94); }
+  to   { opacity: 1; transform: none; }
+}
+
+.header {
+  padding: 14px 16px 10px;
+}
+
+.songName {
+  font-size: 13px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.artistName {
+  font-size: 11px; color: var(--muted); margin-top: 2px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0 8px;
+}
+
+.items {
+  padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+
+.item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  text-decoration: none; color: var(--text);
+  transition: background .15s;
+  position: relative;
+}
+
+.item:hover { background: rgba(255,255,255,.07); }
+
+.item::before {
+  content: '';
+  position: absolute; left: 0; top: 20%; bottom: 20%;
+  width: 2px; border-radius: 2px;
+  background: var(--platform-color);
+  opacity: 0;
+  transition: opacity .15s;
+}
+.item:hover::before { opacity: 1; }
+
+.icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.06);
+  flex-shrink: 0;
+}
+
+.itemText { flex: 1; min-width: 0; }
+
+.itemName  { font-size: 13px; font-weight: 500; display: block; }
+.itemSub   { font-size: 10px; color: var(--muted); display: block; margin-top: 1px; }
+
+.arrow { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+
+.footer {
+  padding: 8px 16px 10px;
+  font-size: 10px; color: var(--muted);
+  text-align: center;
+  border-top: 1px solid var(--border);
+}

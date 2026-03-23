@@ -1,0 +1,63 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+
+  swipes   Swipe[]
+  playlist PlaylistSong[]
+}
+
+// Songs are NOT pre-seeded — they come live from MusicBrainz.
+// They are upserted into the DB the first time a user swipes on them,
+// so we can reference them via foreign keys in Swipe and PlaylistSong.
+model Song {
+  id       String  @id      // MusicBrainz Recording MBID (UUID)
+  title    String
+  artist   String
+  genre    String
+  bpm      Int?             // nullable — MusicBrainz doesn't always provide BPM
+  duration String
+  emoji    String
+  color    String
+  color2   String
+  desc     String
+
+  swipes   Swipe[]
+  playlist PlaylistSong[]
+}
+
+model Swipe {
+  id        String   @id @default(cuid())
+  userId    String
+  songId    String
+  direction String   // "left" | "right"
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  song Song @relation(fields: [songId], references: [id])
+
+  @@unique([userId, songId])
+}
+
+model PlaylistSong {
+  id      String   @id @default(cuid())
+  userId  String
+  songId  String
+  addedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  song Song @relation(fields: [songId], references: [id])
+
+  @@unique([userId, songId])
+}

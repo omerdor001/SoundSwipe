@@ -1,0 +1,241 @@
+/* src/components/MiniPlayer.module.css */
+.player {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(13,13,20,.97);
+  backdrop-filter: blur(28px);
+  border-top: 1px solid var(--border);
+  z-index: 200;
+  animation: slideUp .3s ease;
+  transition: box-shadow .3s;
+}
+
+.player.expanded {
+  box-shadow: 0 -20px 60px rgba(0,0,0,.7);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+
+/* ── Scrubber ── */
+.scrubberWrap {
+  padding: 0 0 0 0;
+  cursor: pointer;
+  height: 18px;
+  display: flex; align-items: center;
+}
+
+.scrubberTrack {
+  position: relative;
+  width: 100%; height: 3px;
+  background: rgba(255,255,255,.1);
+  border-radius: 2px;
+  transition: height .15s;
+}
+
+.scrubberWrap:hover .scrubberTrack { height: 5px; }
+
+.scrubberFill {
+  position: absolute; top: 0; left: 0; height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent3));
+  border-radius: 2px;
+  transition: width .1s linear;
+}
+
+.scrubberThumb {
+  position: absolute; top: 50%;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform .15s;
+  box-shadow: 0 0 6px rgba(0,0,0,.5);
+}
+
+.scrubberWrap:hover .scrubberThumb { transform: translate(-50%, -50%) scale(1); }
+
+/* ── Main row ── */
+.mainRow {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 20px 12px;
+}
+
+/* ── Cover art ── */
+.cover {
+  width: 46px; height: 46px; border-radius: 10px;
+  flex-shrink: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .2s;
+  box-shadow: 0 4px 14px rgba(0,0,0,.4);
+}
+.cover:hover { transform: scale(1.05); }
+
+.coverEmoji { font-size: 22px; }
+
+/* ── Info ── */
+.info { flex: 1; min-width: 0; cursor: pointer; }
+
+.title {
+  font-size: 13px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.artist { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.noPreview, .loadingDots { font-size: 10px; opacity: .6; }
+
+/* ── Time ── */
+.time {
+  font-size: 11px; color: var(--muted);
+  font-family: 'Unbounded', monospace;
+  flex-shrink: 0; letter-spacing: .5px;
+}
+.timeSep { opacity: .4; margin: 0 2px; }
+
+/* ── Controls ── */
+.controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+.skipBtn {
+  background: none; border: none; color: var(--muted);
+  font-size: 17px; padding: 5px; border-radius: 8px;
+  transition: color .15s, background .15s;
+}
+.skipBtn:hover { color: var(--text); background: rgba(255,255,255,.06); }
+
+.playBtn {
+  width: 42px; height: 42px; border-radius: 50%; border: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent3));
+  color: #fff; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .15s, box-shadow .15s;
+  box-shadow: 0 4px 14px rgba(255,61,107,.3);
+}
+.playBtn:hover:not(:disabled) { transform: scale(1.08); box-shadow: 0 6px 20px rgba(255,61,107,.4); }
+.playBtn:disabled { opacity: .5; cursor: not-allowed; }
+.playBtn.playing { animation: pulse 2s ease-in-out infinite; }
+
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(255,61,107,.4); }
+  50%      { box-shadow: 0 0 0 8px rgba(255,61,107,0); }
+}
+
+.spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  animation: spin .7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Volume ── */
+.volumeWrap {
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+}
+
+.volIcon { font-size: 14px; }
+
+.volumeSlider {
+  -webkit-appearance: none;
+  width: 72px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,.15); outline: none;
+  cursor: pointer;
+}
+.volumeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--text); cursor: pointer;
+  transition: transform .15s;
+}
+.volumeSlider:hover::-webkit-slider-thumb { transform: scale(1.3); }
+
+/* ── Expanded panel ── */
+.expandedPanel {
+  display: flex; gap: 0;
+  border-top: 1px solid var(--border);
+  max-height: 360px;
+  overflow: hidden;
+  animation: expandIn .25s ease;
+}
+
+@keyframes expandIn {
+  from { max-height: 0; opacity: 0; }
+  to   { max-height: 360px; opacity: 1; }
+}
+
+.expandedArt {
+  width: 180px; min-height: 180px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.expandedEmoji { font-size: 56px; opacity: .6; }
+
+.expandedInfo {
+  flex: 1; padding: 20px 20px 16px;
+  overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
+}
+
+.expandedTitle {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 16px; font-weight: 700; line-height: 1.3;
+}
+
+.expandedArtist { color: var(--muted); font-size: 13px; }
+.expandedGenre  { font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+
+.previewBadge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--yes);
+  background: rgba(29,185,84,.1);
+  border: 1px solid rgba(29,185,84,.2);
+  border-radius: 20px; padding: 3px 10px;
+  width: fit-content;
+}
+
+.noPreviewMsg {
+  font-size: 11px; color: var(--muted);
+  background: rgba(255,255,255,.04);
+  border-radius: 8px; padding: 6px 10px;
+}
+
+.deezerLink {
+  display: inline-flex; align-items: center;
+  font-size: 12px; font-weight: 600;
+  color: #ff8040; text-decoration: none;
+  background: rgba(255,128,64,.1);
+  border: 1px solid rgba(255,128,64,.25);
+  border-radius: 20px; padding: 5px 14px;
+  width: fit-content; transition: background .15s;
+}
+.deezerLink:hover { background: rgba(255,128,64,.2); }
+
+/* ── Queue list ── */
+.queueList {
+  margin-top: 8px;
+  display: flex; flex-direction: column; gap: 2px;
+  overflow-y: auto; max-height: 160px;
+}
+
+.queueItem {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 8px; border-radius: 8px;
+  cursor: pointer; transition: background .15s;
+}
+.queueItem:hover { background: rgba(255,255,255,.06); }
+.queueItem.queueActive { background: rgba(255,61,107,.1); }
+
+.queueEmoji { font-size: 18px; flex-shrink: 0; }
+
+.queueInfo { flex: 1; min-width: 0; }
+.queueTitle  { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.queueArtist { font-size: 10px; color: var(--muted); display: block; }
+
+.nowPlaying { font-size: 10px; color: var(--accent); flex-shrink: 0; }
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .volumeWrap { display: none; }
+  .time       { display: none; }
+  .expandedArt { width: 120px; min-height: 120px; }
+}
