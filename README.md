@@ -114,13 +114,3 @@ Songs are **never pre-loaded** into the database. Instead:
 | Backend | Node.js, Express |
 | Auth | JWT + bcryptjs |
 | Database | PostgreSQL via Prisma ORM |
-| Deployment | Vercel (FE) + Railway (BE) + Supabase (DB) |
-
----
-
-## ✨ Extending
-
-- **Cover art**: Use the [Cover Art Archive API](https://coverartarchive.org/) (also by MusicBrainz) to fetch real album artwork by release MBID
-- **Audio preview**: Integrate [Spotify Web API](https://developer.spotify.com/documentation/web-api) to add 30-second previews
-- **BPM**: Use [AcousticBrainz](https://acousticbrainz.org/) data (also MetaBrainz project) to get BPM and mood data
-- **Recommendations**: Track genre preferences from swipe history and bias the MusicBrainz queries accordingly
