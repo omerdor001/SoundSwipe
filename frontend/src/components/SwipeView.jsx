@@ -8,8 +8,7 @@ import SnippetPlayer from "./SnippetPlayer";
 import styles from "./SwipeView.module.css";
 
 const GENRES = [
-  "pop","rock","hip-hop","electronic","indie",
-  "r&b","jazz","metal","classical","country","dance","soul",
+  "pop","rock","hip hop","electronic","jazz","metal","country",
 ];
 
 const MODES = [
@@ -115,6 +114,29 @@ export default function SwipeView() {
     }
   }
 
+  async function handleSimilar() {
+    setCacheMsg("Finding similar songs...");
+    try {
+      const songs = await songsApi.getSimilar(20);
+      
+      if (songs.length === 0) {
+        setCacheMsg("Like some songs first to get recommendations!");
+        setTimeout(() => setCacheMsg(""), 3000);
+        return;
+      }
+      
+      setCacheMsg(`Found ${songs.length} similar songs!`);
+      setTimeout(() => setCacheMsg(""), 2000);
+      
+      const { swipedIds } = useStore.getState();
+      const filtered = songs.filter(s => !swipedIds.has(s.id));
+      useStore.setState({ queue: filtered, queueIndex: 0, activeGenre: "" });
+    } catch (err) {
+      setCacheMsg("Failed to load similar songs");
+      setTimeout(() => setCacheMsg(""), 3000);
+    }
+  }
+
   function clearSearch() {
     setSearchQ(""); setSearchTitle(""); setSearchArtist("");
     loadQueue(activeGenre ? { genre: activeGenre } : {});
@@ -162,6 +184,13 @@ export default function SwipeView() {
           onClick={() => setSearchOpen(o => !o)}
           title="Search songs"
         >🔍</button>
+        
+        {/* Similar songs button */}
+        <button
+          className={styles.searchToggle}
+          onClick={handleSimilar}
+          title="Songs similar to your likes"
+        >✨</button>
       </div>
 
       {/* ── Collapsible search drawer ── */}

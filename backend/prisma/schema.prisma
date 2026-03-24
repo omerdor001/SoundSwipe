@@ -14,6 +14,11 @@ model User {
   password  String
   createdAt DateTime @default(now())
 
+  spotifyId           String?
+  spotifyAccessToken  String?
+  spotifyRefreshToken String?
+  spotifyTokenExpiry  DateTime?
+
   swipes   Swipe[]
   playlist PlaylistSong[]
 }
@@ -32,6 +37,10 @@ model Song {
   color    String
   color2   String
   desc     String
+  coverUrl    String?
+  spotifyUrl  String?
+  previewUrl  String?
+  features    Json?         // { energy, danceability, valence, tempo, acousticness, instrumentalness, speechiness }
 
   swipes   Swipe[]
   playlist PlaylistSong[]

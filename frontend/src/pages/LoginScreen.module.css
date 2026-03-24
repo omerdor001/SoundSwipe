@@ -102,3 +102,49 @@
 
 .err { color: var(--no); font-size: 13px; margin-top: 12px; text-align: center; }
 .ok  { color: var(--yes); font-size: 13px; margin-top: 12px; text-align: center; }
+
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.divider span {
+  padding: 0 12px;
+}
+
+.btnSpotify {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #1DB954;
+  border-radius: 12px;
+  background: transparent;
+  color: #1DB954;
+  font-family: 'Unbounded', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all .2s;
+}
+
+.btnSpotify:hover {
+  background: rgba(29, 185, 84, 0.1);
+  transform: translateY(-1px);
+}

@@ -33,12 +33,15 @@ export const authApi = {
 export const songsApi = {
   // Get discovery queue — optional ?genre=pop or ?search=radiohead
   getQueue:  (params = {}) => {
+    params._t = Date.now();
     const qs = new URLSearchParams(params).toString();
-    return request(`/songs${qs ? "?" + qs : ""}`);
+    return request(`/songs?${qs}`);
   },
   // Dedicated search
   search:    (q, mode = 'artist') => request(`/songs/search?q=${encodeURIComponent(q)}&mode=${mode}`),
   clearCache: () => request('/songs/cache/clear', { method: 'POST' }),
+  // Similar songs based on liked songs
+  getSimilar: (limit = 20) => request(`/songs/similar?limit=${limit}`),
 };
 
 // ── Preview cache ─────────────────────────────────────
@@ -64,6 +67,9 @@ export const playlistApi = {
 
 // ── Preview (Deezer 30s preview + cover art, fetched server-side) ──
 export const previewApi = {
-  get: (title, artist) =>
-    request(`/preview?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`),
+  get: (title, artist, songId = null) => {
+    const params = new URLSearchParams({ title, artist });
+    if (songId) params.set('songId', songId);
+    return request(`/preview?${params}`);
+  },
 };

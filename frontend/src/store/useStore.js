@@ -3,7 +3,6 @@ import { create } from "zustand";
 import { authApi, songsApi, swipesApi, playlistApi } from "../api/client";
 
 const useStore = create((set, get) => ({
-  // ── Auth ───────────────────────────────────────────
   user:  null,
   token: localStorage.getItem("ss_token") || null,
 
@@ -21,9 +20,13 @@ const useStore = create((set, get) => ({
     await get().loadQueue();
   },
 
+  loginWithSpotify: () => {
+    window.location.href = "/api/auth/spotify";
+  },
+
   logout: () => {
     localStorage.removeItem("ss_token");
-    set({ user: null, token: null, queue: [], swipedIds: new Set(), playlist: [], queueIndex: 0 });
+    set({ user: null, token: null, queue: [], swipedIds: new Set(), playlist: [], queueIndex: 0, spotifyCallback: false });
   },
 
   restoreSession: async () => {
@@ -77,7 +80,7 @@ const useStore = create((set, get) => ({
   },
 
   filterByGenre: async (genre) => {
-    set({ activeGenre: genre, searchQuery: "" });
+    set({ activeGenre: genre, searchQuery: "", queue: [], queueIndex: 0 });
     await get().loadQueue(genre ? { genre } : {});
   },
 

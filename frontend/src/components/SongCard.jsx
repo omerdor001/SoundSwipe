@@ -13,7 +13,6 @@ export default function SongCard({ song }) {
       <div className={styles.overlay} />
       <div className={styles.emoji}>{song.emoji}</div>
       <div className={styles.content}>
-        <span className={styles.genre}>{song.genre}</span>
         <h2 className={styles.title}>{song.title}</h2>
         <p className={styles.artist}>{song.artist}</p>
         <div className={styles.meta}>

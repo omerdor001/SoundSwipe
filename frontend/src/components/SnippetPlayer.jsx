@@ -19,10 +19,7 @@ export default function SnippetPlayer({ song }) {
 
   // ── Fetch preview URL whenever the card changes ────────────
   useEffect(() => {
-    if (!song) return;
-    let cancelled = false;
-
-    // Stop current audio immediately
+    // Stop current audio when song changes (including when song becomes null)
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = "";
@@ -32,6 +29,11 @@ export default function SnippetPlayer({ song }) {
     setIsPlaying(false);
     setProgress(0);
     setHasPreview(true);
+    setLoading(false);
+
+    if (!song) return;
+    
+    let cancelled = false;
     setLoading(true);
 
     previewApi.get(song.title, song.artist).then(data => {
@@ -40,7 +42,6 @@ export default function SnippetPlayer({ song }) {
       if (data?.previewUrl) {
         setPreviewUrl(data.previewUrl);
         setCoverUrl(data.coverUrl || null);
-        // Auto-play when preview is ready
         setIsPlaying(true);
       } else {
         setHasPreview(false);

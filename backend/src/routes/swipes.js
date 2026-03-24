@@ -12,7 +12,7 @@ const prisma = new PrismaClient();
 // (songs are NOT pre-seeded — they come live from MusicBrainz).
 router.post("/", authMiddleware, async (req, res) => {
   const { song, direction } = req.body;
-
+  console.log(song.genre);
   if (!song?.id || !["left", "right"].includes(direction)) {
     return res.status(400).json({ error: "song object and direction (left|right) required" });
   }
@@ -23,16 +23,20 @@ router.post("/", authMiddleware, async (req, res) => {
       where: { id: song.id },
       update: {},   // Don't overwrite existing data
       create: {
-        id:       song.id,
-        title:    song.title,
-        artist:   song.artist,
-        genre:    song.genre || "Unknown",
-        bpm:      song.bpm || null,
-        duration: song.duration || "?:??",
-        emoji:    song.emoji || "🎵",
-        color:    song.color || "#0d0d1a",
-        color2:   song.color2 || "#1a1a33",
-        desc:     song.desc || "",
+        id:         song.id,
+        title:      song.title,
+        artist:     song.artist,
+        genre:      song.genre && song.genre !== "Unknown" ? song.genre : "Unknown",
+        bpm:        song.bpm    || null,
+        duration:   song.duration || "?:??",
+        emoji:      song.emoji || "🎵",
+        color:      song.color  || "#0d0d1a",
+        color2:     song.color2 || "#1a1a33",
+        desc:       song.desc   || "",
+        coverUrl:   song.coverUrl   || null,
+        spotifyUrl: song.spotifyUrl || null,
+        previewUrl: song.previewUrl || null,
+        features:   song.features   || null,
       },
     });
 
