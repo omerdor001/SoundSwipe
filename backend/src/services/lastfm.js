@@ -160,7 +160,6 @@ async function getTrackFeatures(artist, track, genre = null) {
         return extractFeaturesFromTags(tags, genre);
       }
     } catch (err) {
-      console.warn("Last.fm fetch error:", err.message);
     }
   }
   
@@ -186,35 +185,43 @@ async function getSimilarTracks(artist, track, limit = 10) {
       }));
     }
   } catch (err) {
-    console.warn("Last.fm similar tracks error:", err.message);
   }
   
   return [];
 }
 
-async function getTopTags(artist, track) {
+async function getTrackInfo(artist, track) {
   if (!LASTFM_API_KEY) {
-    return [];
+    return null;
   }
 
-  const url = `${LASTFM_API}?method=track.getTopTags&artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(track)}&api_key=${LASTFM_API_KEY}&format=json`;
+  const url = `${LASTFM_API}?method=track.getInfo&artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(track)}&api_key=${LASTFM_API_KEY}&format=json`;
   
   try {
     const res = await httpsGet(url);
     
-    if (res.status === 200 && res.data?.toptags?.tag) {
-      return res.data.toptags.tag;
+    if (res.status === 200 && res.data?.track) {
+      return {
+        duration: res.data.track.duration ? msToMinSec(parseInt(res.data.track.duration)) : null,
+        tags: res.data.track.toptags?.tag || [],
+      };
     }
   } catch (err) {
-    console.warn("Last.fm top tags error:", err.message);
   }
   
-  return [];
+  return null;
+}
+
+function msToMinSec(ms) {
+  if (!ms) return "?:??";
+  const totalSec = Math.round(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 module.exports = {
   getTrackFeatures,
-  getTopTags,
   getSimilarTracks,
-  extractFeaturesFromTags,
+  getTrackInfo,
 };

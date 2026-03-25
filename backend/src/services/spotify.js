@@ -142,9 +142,6 @@ function httpsGet(url, headers) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const path = urlObj.pathname + urlObj.search;
-    console.log("Full URL:", url);
-    console.log("Parsed hostname:", urlObj.hostname);
-    console.log("Parsed path:", path);
     const options = {
       hostname: urlObj.hostname,
       path: path,
@@ -290,121 +287,6 @@ async function searchTracks(q, limit = 20, offset = 0, market = null) {
   return normalized.filter(Boolean);
 }
 
-/**
- * Get recommendations based on seed tracks, seed artists, or genre fallback.
- * This version avoids using unreliable Spotify genre seeds.
- */
-async function getRecommendations({ seedTrackIds = [], seedArtistIds = [], genreFallback = "pop", limit = 50, market = "US" } = {}) {
-  let tracks = [];
-  if (seedTrackIds.length || seedArtistIds.length) {
-    const params = new URLSearchParams({ limit: String(Math.min(limit, 100)), market });
-
-    if (seedTrackIds.length) params.set("seed_tracks", seedTrackIds.slice(0, 5).join(","));
-    if (seedArtistIds.length) params.set("seed_artists", seedArtistIds.slice(0, 5).join(","));
-
-    try {
-      const data = await spotifyGet(`/recommendations?${params.toString()}`);
-      tracks = data?.tracks || [];
-    } catch (err) {
-      console.warn("Spotify recommendations failed with seeds, falling back to search:", err.message);
-    }
-  }
-
-  if (!tracks.length) {
-    try {
-      const searchQuery = `${genreFallback} music`;
-      tracks = await searchTracks(searchQuery, limit, 0, market);
-    } catch (err) {
-      console.warn("Spotify search fallback failed:", err.message);
-      tracks = [];
-    }
-  }
-
-  const ids = tracks.map(t => t.id).filter(Boolean).join(",");
-  let featuresMap = {};
-  if (ids) {
-    try {
-      const featData = await spotifyGet(`/audio-features?ids=${ids}`);
-      for (const f of (featData.audio_features || [])) {
-        if (f) featuresMap[f.id] = f;
-      }
-    } catch {
-      // ignore, optional
-    }
-  }
-
-  const normalized = await Promise.all(
-    tracks.map(t => normalizeTrack(t, featuresMap[t.id] || null))
-  );
-
-  return normalized.filter(Boolean);
-}
-
-/**
- * Get available genres via text search fallback.
- * Spotify's /available-genre-seeds is unreliable; we return a curated list.
- */
-async function getAvailableGenres() {
-  try {
-    const data = await spotifyGet("/recommendations/available-genre-seeds");
-    if (Array.isArray(data?.genres) && data.genres.length) return data.genres;
-  } catch {
-    // ignore errors
-  }
-  return [
-    "pop","rock","hip-hop","rap","edm","dance","house","electronic","indie",
-    "rnb","metal","blues","funk","classical","country","folk","reggae","latin","k-pop"
-  ];
-}
-
-async function getRecommendationsByGenre(userToken, genre, limit = 50) {
-  const params = new URLSearchParams({
-    seed_genres: genre,
-    limit: String(Math.min(limit, 100))
-  });
-  
-  const res = await httpsGet(`${SPOTIFY_BASE}/recommendations?${params.toString()}`, {
-    Authorization: `Bearer ${userToken}`
-  });
-  
-  if (res.status >= 400) {
-    throw new Error(`Spotify recommendations error: ${res.status}`);
-  }
-  
-  return res.data?.tracks || [];
-}
-
-async function getAudioFeatures(trackIds) {
-  if (!trackIds || trackIds.length === 0) return {};
-  
-  const ids = trackIds.filter(Boolean).join(",");
-  try {
-    const data = await spotifyGet(`/audio-features?ids=${ids}`);
-    const featuresMap = {};
-    for (const f of (data?.audio_features || [])) {
-      if (f) {
-        featuresMap[f.id] = {
-          energy:           f.energy ?? null,
-          danceability:     f.danceability ?? null,
-          valence:          f.valence ?? null,
-          tempo:            f.tempo ?? null,
-          acousticness:     f.acousticness ?? null,
-          instrumentalness: f.instrumentalness ?? null,
-          speechiness:      f.speechiness ?? null,
-        };
-      }
-    }
-    return featuresMap;
-  } catch (err) {
-    console.warn("Spotify audio features error:", err.message);
-    return {};
-  }
-}
-
 module.exports = { 
   searchTracks, 
-  getRecommendations, 
-  getAvailableGenres,
-  getRecommendationsByGenre,
-  getAudioFeatures
 };

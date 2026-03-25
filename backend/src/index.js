@@ -2,6 +2,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 
 const authRoutes    = require("./routes/auth");
 const songRoutes    = require("./routes/songs");
@@ -13,7 +14,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ── Middleware ──────────────────────────────────────
-app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000" }));
+app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000", credentials: true }));
+app.use(cookieParser());
 app.use(express.json());
 
 // ── Routes ──────────────────────────────────────────
@@ -21,7 +23,7 @@ app.use("/api/auth",     authRoutes);
 app.use("/api/songs",    songRoutes);
 app.use("/api/swipes",   swipeRoutes);
 app.use("/api/playlist", playlistRoutes);
-app.use("/api/preview",  previewRoutes);  // Deezer 30s preview + cover art
+app.use("/api/preview",  previewRoutes); 
 
 // ── Health check ────────────────────────────────────
 app.get("/api/health", (req, res) => {

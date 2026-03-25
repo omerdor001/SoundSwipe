@@ -1,10 +1,36 @@
 // src/routes/swipes.js
 const express = require("express");
 const authMiddleware = require("../middleware/auth");
+const cron = require("node-cron");
 
 const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
+
+async function cleanupOldSwipes() {
+  try {
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    const result = await prisma.swipe.deleteMany({
+      where: {
+        direction: "left",
+        createdAt: { lt: oneMonthAgo },
+      },
+    });
+
+    console.log(`[Cleanup] Deleted ${result.count} old unliked swipes`);
+  } catch (err) {
+    console.error("[Cleanup] Error:", err.message);
+  }
+}
+
+cron.schedule("0 0 1 * *", cleanupOldSwipes);
+console.log("[Scheduler] Monthly swipe cleanup scheduled for the 1st of each month");
+
+if (process.env.RUN_CLEANUP_ON_START === "true") {
+  cleanupOldSwipes();
+}
 
 // POST /api/swipes
 // Body: { song: <full song object from MusicBrainz>, direction: "left"|"right" }
@@ -12,7 +38,6 @@ const prisma = new PrismaClient();
 // (songs are NOT pre-seeded — they come live from MusicBrainz).
 router.post("/", authMiddleware, async (req, res) => {
   const { song, direction } = req.body;
-  console.log(song.genre);
   if (!song?.id || !["left", "right"].includes(direction)) {
     return res.status(400).json({ error: "song object and direction (left|right) required" });
   }
@@ -87,6 +112,15 @@ router.post("/reset", authMiddleware, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
+});
+
+// POST /api/swipes/cleanup  — manually trigger cleanup of old unliked swipes
+router.post("/cleanup", authMiddleware, async (req, res) => {
+  if (req.user.username !== "admin") {
+    return res.status(403).json({ error: "Admin only" });
+  }
+  await cleanupOldSwipes();
+  res.json({ ok: true });
 });
 
 module.exports = router;

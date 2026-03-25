@@ -4,19 +4,16 @@ import { authApi, songsApi, swipesApi, playlistApi } from "../api/client";
 
 const useStore = create((set, get) => ({
   user:  null,
-  token: localStorage.getItem("ss_token") || null,
 
   login: async (username, password) => {
-    const { token, user } = await authApi.login(username, password);
-    localStorage.setItem("ss_token", token);
-    set({ token, user });
+    const { user } = await authApi.login(username, password);
+    set({ user });
     await get().loadQueue();
   },
 
   signup: async (username, password) => {
-    const { token, user } = await authApi.signup(username, password);
-    localStorage.setItem("ss_token", token);
-    set({ token, user });
+    const { user } = await authApi.signup(username, password);
+    set({ user });
     await get().loadQueue();
   },
 
@@ -24,21 +21,18 @@ const useStore = create((set, get) => ({
     window.location.href = "/api/auth/spotify";
   },
 
-  logout: () => {
-    localStorage.removeItem("ss_token");
-    set({ user: null, token: null, queue: [], swipedIds: new Set(), playlist: [], queueIndex: 0, spotifyCallback: false });
+  logout: async () => {
+    await authApi.logout();
+    set({ user: null, queue: [], swipedIds: new Set(), playlist: [], queueIndex: 0, spotifyCallback: false });
   },
 
   restoreSession: async () => {
-    const token = localStorage.getItem("ss_token");
-    if (!token) return;
     try {
       const { user } = await authApi.me();
       set({ user });
       await Promise.all([get().loadQueue(), get().loadPlaylist()]);
     } catch {
-      localStorage.removeItem("ss_token");
-      set({ token: null });
+      set({ user: null });
     }
   },
 

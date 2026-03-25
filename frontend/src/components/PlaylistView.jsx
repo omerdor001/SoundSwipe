@@ -79,7 +79,11 @@ export default function PlaylistView() {
   const [searchQ, setSearchQ] = useState("");
 
   const totalMins = playlist.reduce((acc, s) => {
-    const [m, sec] = (s.duration || "0:00").split(":").map(Number);
+    const dur = s.duration || "0:00";
+    if (typeof dur === "number") return acc + dur / 60;
+    const parts = dur.split(":").map(Number);
+    const m = parts[0] || 0;
+    const sec = parts[1] || 0;
     return acc + m + sec / 60;
   }, 0);
   const genres = [...new Set(playlist.map(s => s.genre))];

@@ -4,8 +4,8 @@ const authMiddleware = require("../middleware/auth");
 const { PrismaClient } = require("@prisma/client");
 const { searchByGenre, getAvailableGenres } = require("../services/deezer");
 const { searchTracks: spotifySearch } = require("../services/spotify");
-const { getTrackFeatures, getSimilarTracks } = require("../services/lastfm");
-const { buildTasteProfile, rankBySimilarity, getTopLikedGenres, getRecentLikedTrackIds } = require("../services/recommender");
+const { getTrackFeatures, getSimilarTracks, getTrackInfo } = require("../services/lastfm");
+const { buildTasteProfile, rankBySimilarity, getRecentLikedTrackIds } = require("../services/recommender");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -15,6 +15,9 @@ const CACHE_TTL = 10 * 60 * 1000;
 
 function getCached(key)          { const e = cache.get(key); if (!e) return null; if (Date.now() > e.expiresAt) { cache.delete(key); return null; } return e.data; }
 function setCache(key, data)     { cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL }); }
+
+const DEFAULT_GENRES = ["pop","rock","hip hop","electronic","indie","r&b","jazz","country","dance","metal"];
+function pickRandomGenre() { return DEFAULT_GENRES[Math.floor(Math.random() * DEFAULT_GENRES.length)]; }
 
 router.post("/cache/clear", authMiddleware, (req, res) => {
   const size = cache.size;
@@ -64,7 +67,6 @@ router.get("/", authMiddleware, async (req, res) => {
       try {
         songs = await searchByGenre(target, 50);
       } catch (err) {
-        console.warn("Deezer search failed:", err.message);
         songs = [];
       }
       
@@ -74,8 +76,8 @@ router.get("/", authMiddleware, async (req, res) => {
 
     let unseen = songs.filter(s => !swipedIds.has(s.id));
 
-    if (unseen.length === 0 && songs.length > 0) {
-      unseen = songs;
+    if (unseen.length === 0) {
+      return res.json([]);
     }
 
     const tasteProfile = await buildTasteProfile(req.user.id);
@@ -132,11 +134,7 @@ router.get("/genres", authMiddleware, async (req, res) => {
     }
     res.json(genres);
   } catch {
-    res.json([
-      "pop","rock","hip hop","electronic","indie","r&b","jazz",
-      "classical","metal","country","folk","reggae","latin","k-pop",
-      "punk","blues","dance","soul","funk","disco","rap","house",
-    ]);
+    res.json(DEFAULT_GENRES);
   }
 });
 
@@ -182,21 +180,28 @@ router.get("/similar", authMiddleware, async (req, res) => {
             }
           }
         } catch (err) {
-          console.warn("Similar tracks error for", song.title, err.message);
         }
       }
       
-      // Convert to array and sort by match score
-      songs = Array.from(similarTracks.values())
+      // Fetch duration for each similar track
+      const tracksArray = Array.from(similarTracks.values())
         .sort((a, b) => b.match - a.match)
-        .slice(0, parseInt(limit))
-        .map(track => ({
+        .slice(0, parseInt(limit));
+      
+      const trackInfos = await Promise.all(
+        tracksArray.map(t => getTrackInfo(t.artist, t.title))
+      );
+      
+      // Convert to array and sort by match score
+      songs = tracksArray.map((track, idx) => {
+        const info = trackInfos[idx];
+        return {
           id: `similar_${Buffer.from(`${track.title}|${track.artist}`).toString("base64")}`,
           title: track.title,
           artist: track.artist,
           genre: track.genre || "Unknown",
           bpm: null,
-          duration: "?:??",
+          duration: info?.duration || "?:??",
           emoji: "🎵",
           color: "#0d0d1a",
           color2: "#1a1a33",
@@ -204,7 +209,8 @@ router.get("/similar", authMiddleware, async (req, res) => {
           coverUrl: null,
           previewUrl: null,
           features: { energy: null, danceability: null, valence: null, tempo: null, acousticness: null, instrumentalness: null, speechiness: null },
-        }));
+        };
+      });
       
       // Enrich with features
       songs = await enrichWithLastFmFeatures(songs);
@@ -218,12 +224,5 @@ router.get("/similar", authMiddleware, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch similar songs" });
   }
 });
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-const DEFAULT_GENRES = ["pop","rock","hip hop","electronic","indie","r&b","jazz","country","dance","metal"];
-
-function pickRandomGenre() {
-  return DEFAULT_GENRES[Math.floor(Math.random() * DEFAULT_GENRES.length)];
-}
 
 module.exports = router;

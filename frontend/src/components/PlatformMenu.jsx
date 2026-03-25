@@ -1,7 +1,6 @@
 // src/components/PlatformMenu.jsx
 import { useState, useEffect, useRef } from "react";
 import { PLATFORMS } from "../utils/platformLinks";
-import { previewApi } from "../api/client";
 import styles from "./PlatformMenu.module.css";
 
 const ICONS = {

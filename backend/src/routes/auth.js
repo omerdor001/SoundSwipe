@@ -1,12 +1,71 @@
 // src/routes/auth.js
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const https = require("https");
 
 const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
+
+const SESSION_EXPIRY_HOURS = 24;
+
+const ENCRYPTION_KEY = process.env.TOKEN_SECRET || crypto.randomBytes(32).toString("hex");
+const IV_LENGTH = 16;
+
+function generateToken() {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+function encryptToken(plainToken) {
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv("aes-256-cbc", Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
+  let encrypted = cipher.update(plainToken, "utf8", "hex");
+  encrypted += cipher.final("hex");
+  return iv.toString("hex") + ":" + encrypted;
+}
+
+function decryptToken(encryptedToken) {
+  try {
+    const parts = encryptedToken.split(":");
+    if (parts.length !== 2) return null;
+    const iv = Buffer.from(parts[0], "hex");
+    const decipher = crypto.createDecipheriv("aes-256-cbc", Buffer.from(ENCRYPTION_KEY.slice(0, 32)), iv);
+    let decrypted = decipher.update(parts[1], "hex", "utf8");
+    decrypted += decipher.final("utf8");
+    return decrypted;
+  } catch {
+    return null;
+  }
+}
+
+function getClientIp(req) {
+  let ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() 
+    || req.headers["x-real-ip"]
+    || req.connection?.remoteAddress
+    || "unknown";
+  
+  // Normalize IPv4-mapped IPv6 to regular IPv4
+  if (ip.startsWith("::ffff:")) {
+    ip = ip.slice(7);
+  }
+  
+  return ip;
+}
+
+function setSessionCookie(res, token) {
+  res.cookie("ss_session", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: SESSION_EXPIRY_HOURS * 60 * 60 * 1000,
+    path: "/",
+  });
+}
+
+function clearSessionCookie(res) {
+  res.clearCookie("ss_session", { path: "/" });
+}
 
 const SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize";
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
@@ -102,13 +161,15 @@ router.post("/signup", async (req, res) => {
       data: { username, password: hashed },
     });
 
-    const token = jwt.sign(
-      { id: user.id, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = generateToken();
+    const expiresAt = new Date(Date.now() + SESSION_EXPIRY_HOURS * 60 * 60 * 1000);
+    const ip = getClientIp(req);
+    await prisma.session.create({
+      data: { token, userId: user.id, expiresAt, ipAddress: ip },
+    });
 
-    res.status(201).json({ token, user: { id: user.id, username: user.username } });
+    setSessionCookie(res, token);
+    res.status(201).json({ user: { id: user.id, username: user.username } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -134,22 +195,74 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Wrong password" });
     }
 
-    const token = jwt.sign(
-      { id: user.id, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = generateToken();
+    const expiresAt = new Date(Date.now() + SESSION_EXPIRY_HOURS * 60 * 60 * 1000);
+    const ip = getClientIp(req);
+    await prisma.session.create({
+      data: { token, userId: user.id, expiresAt, ipAddress: ip },
+    });
 
-    res.json({ token, user: { id: user.id, username: user.username } });
+    setSessionCookie(res, token);
+    res.json({ user: { id: user.id, username: user.username } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// GET /api/auth/me  (verify token + return user)
-router.get("/me", require("../middleware/auth"), async (req, res) => {
-  res.json({ user: { id: req.user.id, username: req.user.username } });
+// GET /api/auth/me  (verify session + return user)
+router.get("/me", async (req, res) => {
+  // Accept token from cookie OR Authorization header
+  let token = req.cookies?.ss_session;
+  if (!token && req.headers.authorization?.startsWith("Bearer ")) {
+    token = req.headers.authorization.slice(7);
+  }
+  
+  // Decrypt if encrypted (from sessionStorage)
+  if (token && token.includes(":")) {
+    const decrypted = decryptToken(token);
+    if (decrypted) token = decrypted;
+  }
+  
+  if (!token) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  try {
+    const session = await prisma.session.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    const clientIp = getClientIp(req);
+    if (!session || session.expiresAt < new Date()) {
+      if (session) {
+        await prisma.session.delete({ where: { id: session.id } });
+      }
+      return res.status(401).json({ error: "Session expired" });
+    }
+
+    // Only enforce IP check in production (not localhost)
+    const isLocalhost = ip => ip === "127.0.0.1" || ip === "::1" || ip === "localhost";
+    if (session.ipAddress && !isLocalhost(session.ipAddress) && !isLocalhost(clientIp)) {
+      if (session.ipAddress !== clientIp) {
+        await prisma.session.delete({ where: { id: session.id } });
+        return res.status(401).json({ error: "Session invalid" });
+      }
+    }
+
+    res.json({ 
+      user: { 
+        id: session.user.id, 
+        username: session.user.username,
+        spotifyId: session.user.spotifyId,
+        spotifyAccessToken: session.user.spotifyAccessToken,
+      }
+    });
+  } catch (err) {
+    console.error("[Auth] /me error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 // GET /api/auth/spotify - Redirect to Spotify login
@@ -237,13 +350,16 @@ router.get("/spotify/callback", async (req, res) => {
       });
     }
     
-    const appToken = jwt.sign(
-      { id: user.id, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = generateToken();
+    const expiresAt = new Date(Date.now() + SESSION_EXPIRY_HOURS * 60 * 60 * 1000);
+    const ip = getClientIp(req);
+    await prisma.session.create({
+      data: { token, userId: user.id, expiresAt, ipAddress: ip },
+    });
     
-    res.redirect(`${process.env.FRONTEND_URL}?token=${appToken}&username=${encodeURIComponent(user.username)}`);
+    setSessionCookie(res, token);
+    const encryptedToken = encryptToken(token);
+    res.redirect(`${process.env.FRONTEND_URL}?token=${encodeURIComponent(encryptedToken)}&loggedin=true`);
   } catch (err) {
     console.error("Spotify callback error:", err);
     res.redirect(`${process.env.FRONTEND_URL}?error=server_error`);
@@ -293,6 +409,16 @@ router.post("/spotify/refresh", require("../middleware/auth"), async (req, res) 
     console.error("Spotify refresh error:", err);
     res.status(500).json({ error: "Server error" });
   }
+});
+
+// POST /api/auth/logout - Clear session
+router.post("/logout", async (req, res) => {
+  const token = req.cookies?.ss_session;
+  if (token) {
+    await prisma.session.deleteMany({ where: { token } }).catch(() => {});
+  }
+  clearSessionCookie(res);
+  res.json({ ok: true });
 });
 
 module.exports = router;

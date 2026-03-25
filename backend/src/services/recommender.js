@@ -2,14 +2,6 @@
 //
 // Content-Based Filtering (CBF) recommendation engine.
 //
-// WHY CBF FOR SOUNDSWIPE:
-//   - Works from user #1, day #1 (no cold-start problem)
-//   - Spotify gives us 7 audio features per track, making CBF very accurate
-//   - Collaborative Filtering (CF) needs hundreds of users with overlapping swipes
-//   - Matrix Factorization (SVD/ALS) is CF under the hood — same cold-start issue
-//   - Neural approaches need tens of thousands of training examples + GPU infra
-//   - Hybrid (CBF + CF) is the right LONG-TERM architecture — migrate when you
-//     have 500+ active users each with 100+ swipes
 //
 // HOW IT WORKS:
 //   1. For each right-swipe (like), we add the song's audio feature vector to a
@@ -83,25 +75,21 @@ function normaliseVector(v) {
 }
 
 /**
- * Build a taste profile vector from a user's swipe history.
- * Returns null if the user has no swipes with audio features yet.
+ * Build a taste profile vector from the user's liked songs.
+ * Returns null if the user has no liked songs with audio features yet.
  */
 async function buildTasteProfile(userId) {
-  // Fetch all swipes with song data + audio features
   const swipes = await prisma.swipe.findMany({
-    where:   { userId },
+    where:   { userId, direction: "right" },
     include: { song: true },
   });
 
   if (!swipes.length) return null;
 
   const zero = new Array(FEATURE_KEYS.length).fill(0);
-  let likeVec    = [...zero];
-  let dislikeVec = [...zero];
-  let likeCount    = 0;
-  let dislikeCount = 0;
-  const likedGenres  = {};
-  const dislikedGenres = {};
+  let likeVec = [...zero];
+  let likeCount = 0;
+  const likedGenres = {};
 
   for (const swipe of swipes) {
     const features = swipe.song?.features;
@@ -109,37 +97,20 @@ async function buildTasteProfile(userId) {
     const vec = toVector(features);
     if (!vec) continue;
 
-    if (swipe.direction === "right") {
-      likeVec = addVectors(likeVec, vec);
-      likeCount++;
-      const g = swipe.song.genre;
-      if (g) likedGenres[g] = (likedGenres[g] || 0) + 1;
-    } else {
-      dislikeVec = addVectors(dislikeVec, vec);
-      dislikeCount++;
-      const g = swipe.song.genre;
-      if (g) dislikedGenres[g] = (dislikedGenres[g] || 0) + 1;
-    }
+    likeVec = addVectors(likeVec, vec);
+    likeCount++;
+    const g = swipe.song.genre;
+    if (g) likedGenres[g] = (likedGenres[g] || 0) + 1;
   }
 
   if (!likeCount) return null;
 
-  // Average the vectors, then compute taste = likes - 0.3 * dislikes
-  const normLike    = normaliseVector(scaleVector(likeVec,    1 / likeCount));
-  const normDislike = dislikeCount
-    ? normaliseVector(scaleVector(dislikeVec, 1 / dislikeCount))
-    : zero;
-
-  const tasteVec = normaliseVector(
-    addVectors(normLike, scaleVector(normDislike, -0.3))
-  );
+  const normLike = normaliseVector(scaleVector(likeVec, 1 / likeCount));
 
   return {
-    vector:        tasteVec,
+    vector:     normLike,
     likedGenres,
-    dislikedGenres,
     likeCount,
-    dislikeCount,
   };
 }
 
@@ -171,27 +142,6 @@ function rankBySimilarity(songs, tasteProfile) {
 }
 
 /**
- * Get the top N genres from the user's like history (for Spotify seed_genres).
- */
-async function getTopLikedGenres(userId, limit = 3) {
-  const swipes = await prisma.swipe.findMany({
-    where:   { userId, direction: "right" },
-    include: { song: { select: { genre: true } } },
-  });
-
-  const counts = {};
-  for (const s of swipes) {
-    const g = s.song?.genre?.toLowerCase();
-    if (g && g !== "unknown") counts[g] = (counts[g] || 0) + 1;
-  }
-
-  return Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([genre]) => genre);
-}
-
-/**
  * Get the Spotify IDs of the user's most recently liked songs (for seed_tracks).
  */
 async function getRecentLikedTrackIds(userId, limit = 5) {
@@ -207,6 +157,5 @@ async function getRecentLikedTrackIds(userId, limit = 5) {
 module.exports = {
   buildTasteProfile,
   rankBySimilarity,
-  getTopLikedGenres,
   getRecentLikedTrackIds,
 };

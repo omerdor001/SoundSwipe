@@ -21,6 +21,21 @@ model User {
 
   swipes   Swipe[]
   playlist PlaylistSong[]
+  sessions Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  ipAddress String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([token])
+  @@index([userId])
 }
 
 // Songs are NOT pre-seeded — they come live from MusicBrainz.

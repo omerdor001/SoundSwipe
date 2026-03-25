@@ -17,7 +17,6 @@ export default function SongCard({ song }) {
         <p className={styles.artist}>{song.artist}</p>
         <div className={styles.meta}>
           <span>⏱ {song.duration}</span>
-          <span>♩ {song.bpm} BPM</span>
         </div>
       </div>
     </div>

@@ -1,19 +1,17 @@
 // src/api/client.js
 const BASE = "/api";
 
-function getToken() {
-  return localStorage.getItem("ss_token");
+function getAuthHeader() {
+  const token = sessionStorage.getItem("ss_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function request(path, options = {}) {
-  const token = getToken();
+  const headers = { "Content-Type": "application/json", ...getAuthHeader(), ...options.headers };
   const res = await fetch(`${BASE}${path}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
+    credentials: "include",
+    headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
@@ -27,6 +25,7 @@ export const authApi = {
   login:  (username, password) => request("/auth/login",  { method: "POST", body: { username, password } }),
   signup: (username, password) => request("/auth/signup", { method: "POST", body: { username, password } }),
   me:     () => request("/auth/me"),
+  logout: () => request("/auth/logout", { method: "POST" }),
 };
 
 // ── Songs (live from MusicBrainz via our backend) ────

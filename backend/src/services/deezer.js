@@ -173,7 +173,6 @@ async function getAvailableGenres() {
 }
 
 module.exports = {
-  searchTracks,
   searchByGenre,
   getAvailableGenres,
 };
