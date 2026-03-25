@@ -20,8 +20,7 @@ export default function LoginScreen() {
 
     if (!username.trim() || !password) return setError("Please fill all fields.");
     if (tab === "signup") {
-      if (username.length < 3) return setError("Username must be 3+ characters.");
-      if (password.length < 4) return setError("Password must be 4+ characters.");
+      if (password.length < 8 && password.length > 16 ) return setError("Password must be 8-16 characters.");
       if (password !== password2) return setError("Passwords don't match.");
     }
 

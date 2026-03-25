@@ -30,7 +30,6 @@ model Session {
   userId    String
   expiresAt DateTime
   createdAt DateTime @default(now())
-  ipAddress String?
 
   user User @relation(fields: [userId], references: [id])
 
