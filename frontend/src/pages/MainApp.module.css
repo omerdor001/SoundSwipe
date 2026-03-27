@@ -1,0 +1,154 @@
+/* src/pages/MainApp.module.css - Musica Theme */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+  background: var(--bg);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(10,10,10,0.95);
+  backdrop-filter: blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navLogo {
+  font-family: 'Crimson Text', serif;
+  font-size: 24px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, #fff, #ff8a8a);
+  -webkit-background-clip: text; 
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.navTabs {
+  display: flex; 
+  gap: 8px;
+  background: rgba(255,107,107,0.08);
+  border-radius: 50px; 
+  padding: 6px;
+  border: 1px solid rgba(255,107,107,0.1);
+}
+
+.navTab {
+  padding: 12px 28px;
+  border: none; 
+  border-radius: 50px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: transparent; 
+  color: rgba(255,255,255,0.6);
+  transition: all 0.3s ease;
+}
+
+.navTab:hover:not(.active) {
+  color: rgba(255,255,255,0.9);
+}
+
+.navTab.active {
+  background: linear-gradient(135deg, #ff6b6b, #c44569);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(255,107,107,0.35);
+}
+
+.navRight {
+  display: flex; 
+  align-items: center; 
+  gap: 16px;
+}
+
+.userChip {
+  display: flex; 
+  align-items: center; 
+  gap: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 50px; 
+  padding: 8px 18px 8px 12px;
+  font-size: 14px;
+  color: rgba(255,255,255,0.7);
+}
+
+.avatar {
+  width: 32px; 
+  height: 32px; 
+  border-radius: 50%;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  font-family: 'Crimson Text', serif;
+  font-size: 14px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #ff6b6b, #c44569);
+  color: #fff;
+}
+
+.btnLogout {
+  padding: 10px 20px;
+  border: 1px solid rgba(255,107,107,0.25);
+  border-radius: 50px; 
+  background: rgba(255,107,107,0.08); 
+  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+}
+
+.btnLogout:hover { 
+  border-color: rgba(255,107,107,0.5); 
+  color: #fff;
+  background: rgba(255,107,107,0.15);
+  transform: translateY(-1px);
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .nav { 
+    padding: 12px 20px; 
+  }
+  
+  .navLogo { 
+    font-size: 20px; 
+  }
+  
+  .navTabs {
+    gap: 4px;
+    padding: 4px;
+  }
+  
+  .navTab { 
+    padding: 10px 16px; 
+    font-size: 11px; 
+  }
+  
+  .userChip span { 
+    display: none; 
+  }
+  
+  .btnLogout {
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+}

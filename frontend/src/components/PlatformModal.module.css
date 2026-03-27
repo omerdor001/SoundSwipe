@@ -1,0 +1,195 @@
+/* src/components/PlatformModal.module.css - Musica Theme */
+
+/* Full-screen dimmed overlay */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(15px);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Modal card */
+.modal {
+  background: linear-gradient(145deg, var(--surface), var(--surface2));
+  border: 1px solid rgba(255,107,107,0.15);
+  border-radius: 28px;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 
+    0 40px 120px rgba(0,0,0,0.7),
+    0 0 80px rgba(255,107,107,0.05);
+  animation: slideUp 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+  overflow: hidden;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px) scale(0.95); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Header row */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 28px 28px 24px;
+}
+
+.cover {
+  width: 72px; height: 72px;
+  border-radius: 18px;
+  flex-shrink: 0;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  background-size: cover;
+  background-position: center;
+  background-color: rgba(255,107,107,0.1);
+}
+
+.coverEmoji { font-size: 32px; }
+
+.headerInfo { flex: 1; min-width: 0; }
+
+.headerLabel {
+  font-size: 10px; 
+  letter-spacing: 3px; 
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.4); 
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.headerTitle {
+  font-family: 'Crimson Text', serif;
+  font-size: 20px; 
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+
+.headerArtist {
+  font-size: 14px; 
+  color: rgba(255,255,255,0.5);
+}
+
+.closeBtn {
+  width: 40px; height: 40px; 
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.6); 
+  font-size: 18px;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.closeBtn:hover { 
+  background: rgba(255,107,107,0.1);
+  border-color: rgba(255,107,107,0.3);
+  color: #fff;
+}
+
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,107,107,0.2), transparent);
+  margin: 0 24px;
+}
+
+/* Platform rows */
+.platforms {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.platformRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 14px;
+  border-radius: 18px;
+  text-decoration: none;
+  color: #fff;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+.platformRow:hover {
+  background: rgba(255,107,107,0.08);
+  border-color: rgba(255,107,107,0.15);
+  transform: translateX(6px);
+}
+
+.platformIcon {
+  width: 50px; height: 50px;
+  border-radius: 16px;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.platformRow:hover .platformIcon {
+  transform: scale(1.08);
+}
+
+.platformInfo {
+  flex: 1; 
+  min-width: 0;
+}
+
+.platformName {
+  display: block;
+  font-size: 16px; 
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.platformSub {
+  display: block;
+  font-size: 13px; 
+  color: rgba(255,255,255,0.4);
+}
+
+.platformArrow {
+  font-size: 20px;
+  color: rgba(255,255,255,0.3);
+  transition: all 0.3s ease;
+}
+
+.platformRow:hover .platformArrow {
+  color: #ff8a8a;
+  transform: translate(4px, -2px);
+}
+
+/* Footer note */
+.footer {
+  padding: 20px 28px 24px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.3);
+  text-align: center;
+  line-height: 1.6;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  margin-top: 8px;
+}

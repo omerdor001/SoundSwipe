@@ -1,0 +1,98 @@
+/* src/components/SongCard.module.css - Musica Theme */
+.card {
+  position: relative;
+  width: 100%; height: 100%;
+  border-radius: 24px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.cardImage {
+  position: absolute; inset: 0;
+  background-size: cover;
+  background-position: center;
+  transition: transform 0.5s ease;
+}
+
+.card:hover .cardImage {
+  transform: scale(1.05);
+}
+
+.overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(0,0,0,0) 0%,
+    rgba(0,0,0,0.1) 20%,
+    rgba(0,0,0,0.5) 50%,
+    rgba(10,10,10,0.98) 100%
+  );
+}
+
+.topGradient {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 160px;
+  background: linear-gradient(180deg, rgba(255,107,107,0.2) 0%, transparent 100%);
+}
+
+.content {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 32px 28px;
+  z-index: 2;
+}
+
+.title {
+  font-family: 'Crimson Text', serif;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 8px;
+  color: #ffffff;
+  text-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  letter-spacing: 0.5px;
+}
+
+.artist {
+  font-size: 18px;
+  color: rgba(255,255,255,0.8);
+  margin-bottom: 18px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+}
+
+.meta {
+  display: flex;
+  gap: 24px;
+  font-size: 14px;
+  color: rgba(255,255,255,0.6);
+  align-items: center;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.meta svg {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  vertical-align: middle;
+  opacity: 0.8;
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 24px;
+  }
+  .artist {
+    font-size: 15px;
+  }
+  .meta {
+    font-size: 11px;
+    gap: 16px;
+  }
+  .content {
+    padding: 24px 20px;
+  }
+}

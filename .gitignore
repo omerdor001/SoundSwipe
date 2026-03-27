@@ -1,0 +1,92 @@
+# 🔹 OS files
+.DS_Store
+Thumbs.db
+
+# 🔹 Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 🔹 Dependency directories
+node_modules/
+.pnpm-store/
+
+# 🔹 Build outputs
+dist/
+build/
+.out/
+.next/
+.cache/
+
+# 🔹 Environment variables
+.env
+.env.*
+!.env.example
+
+# 🔹 IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 🔹 Mac / Windows
+.DS_Store
+Thumbs.db
+
+# 🔹 Coverage
+coverage/
+
+# 🔹 Misc
+*.tgz
+*.zip
+
+# 🔹 TypeScript
+*.tsbuildinfo
+
+# 🔹 Android
+.gradle/
+build/
+*.keystore
+!debug.keystore
+*.jks
+*.apk
+*.aab
+local.properties
+Captures/
+.externalNativeBuild/
+.cxx/
+*.pyc
+output.json
+
+# 🔹 iOS
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.symlink
+*.moved-aside
+Podfile.lock
+.pnpm-debug.log*
+Pods/
+build/
+/ios/Pods/
+/ios/Frameworks/
+
+# 🔹 Expo (If using React Native Expo)
+.expo/
+*.jks
+*.p12
+*.key
+*.mobileprovision
+dist/
+
+# 🔹 Optional: lock files (choose your preference)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
