@@ -55,30 +55,52 @@ function AppNavigator() {
   const { user, loading, refreshKey, loginWithToken } = useAuth();
 
   useEffect(() => {
+    // Check for token in URL params (from Spotify callback)
+    const checkUrlParams = () => {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      const loggedin = params.get('loggedin');
+      const error = params.get('error');
+      
+      if (loggedin === 'true' && token) {
+        const userId = params.get('userId');
+        const username = params.get('username');
+        
+        if (userId) {
+          console.log('Spotify login success, logging in user:', username);
+          loginWithToken({ id: userId, username: username || '' }, token);
+        }
+        
+        // Clear URL params
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    };
+    
+    checkUrlParams();
+    
+    // Listen for URL changes
     const handleUrl = (event) => {
       const { url } = event;
-      if (url && url.startsWith('soundswipe://spotify-callback')) {
-        const parsed = Linking.parse(url);
-        if (parsed.queryParams?.token && parsed.queryParams?.userId) {
-          loginWithToken(
-            { id: parsed.queryParams.userId, username: parsed.queryParams.username },
-            parsed.queryParams.token
-          );
-        }
+      if (url) {
+        try {
+          const urlObj = new URL(url);
+          if (urlObj.searchParams.get('loggedin') === 'true' && urlObj.searchParams.get('token')) {
+            checkUrlParams();
+          }
+        } catch (e) {}
       }
     };
 
     Linking.addEventListener('url', handleUrl);
     
     Linking.getInitialURL().then(url => {
-      if (url && url.startsWith('soundswipe://spotify-callback')) {
-        const parsed = Linking.parse(url);
-        if (parsed.queryParams?.token && parsed.queryParams?.userId) {
-          loginWithToken(
-            { id: parsed.queryParams.userId, username: parsed.queryParams.username },
-            parsed.queryParams.token
-          );
-        }
+      if (url) {
+        try {
+          const urlObj = new URL(url);
+          if (urlObj.searchParams.get('loggedin') === 'true') {
+            checkUrlParams();
+          }
+        } catch (e) {}
       }
     });
 

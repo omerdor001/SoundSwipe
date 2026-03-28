@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as WebBrowser from 'expo-web-browser';
 import { useAuth, API_URL } from '../context/AuthContext';
 
 export default function LoginScreen() {
@@ -21,7 +20,7 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [spotifyLoading, setSpotifyLoading] = useState(false);
-  const { login, signup, loginWithToken } = useAuth();
+  const { login, signup } = useAuth();
 
   const handleSubmit = async () => {
     if (!username || !password) {
@@ -59,48 +58,13 @@ export default function LoginScreen() {
     setSpotifyLoading(true);
     
     try {
-      const isWeb = typeof window !== 'undefined' && window.location;
-      const platform = isWeb ? 'web' : 'native';
-      
-      const res = await fetch(`${API_URL}/api/auth/spotify/auth-url?platform=${platform}`);
+      const res = await fetch(`${API_URL}/api/auth/spotify/auth-url?platform=web`);
       const data = await res.json();
       
-      if (!data.url) {
-        setError('Could not get Spotify auth URL');
-        setSpotifyLoading(false);
-        return;
-      }
-
-      if (platform === 'native') {
-        const result = await WebBrowser.openBrowserAsync(data.url);
-        if (result.type === 'success') {
-          const urlObj = new URL(result.url);
-          const token = urlObj.searchParams.get('token');
-          const userId = urlObj.searchParams.get('userId');
-          const username = urlObj.searchParams.get('username');
-          
-          if (token && userId) {
-            loginWithToken({ id: userId, username }, token);
-          }
-        }
+      if (data.url) {
+        window.location.href = data.url;
       } else {
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          `${API_URL}/api/auth/spotify/mobile-callback`
-        );
-        
-        if (result.type === 'success' && result.url) {
-          const urlObj = new URL(result.url);
-          const token = urlObj.searchParams.get('token');
-          const userId = urlObj.searchParams.get('userId');
-          const username = urlObj.searchParams.get('username');
-          
-          if (token && userId) {
-            loginWithToken({ id: userId, username }, token);
-          } else {
-            setError('Spotify login failed');
-          }
-        }
+        setError('Spotify login failed');
       }
     } catch (err) {
       setError('Spotify login failed. Please try again.');

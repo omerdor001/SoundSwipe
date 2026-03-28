@@ -89,12 +89,15 @@ function redirectToSpotify(req, res) {
 async function handleCallback(req, res) {
   const { code, error } = req.query;
   
+  const isMobile = req.query.mobile === 'true';
+  const redirectBase = isMobile ? (process.env.MOBILE_URL || process.env.FRONTEND_URL) : process.env.FRONTEND_URL;
+  
   if (error) {
-    return res.redirect(`${process.env.FRONTEND_URL}?error=spotify_auth_failed`);
+    return res.redirect(`${redirectBase}?error=spotify_auth_failed`);
   }
   
   if (!code) {
-    return res.redirect(`${process.env.FRONTEND_URL}?error=no_code`);
+    return res.redirect(`${redirectBase}?error=no_code`);
   }
   
   try {
@@ -114,7 +117,7 @@ async function handleCallback(req, res) {
     }, body);
     
     if (tokenRes.status !== 200) {
-      return res.redirect(`${process.env.FRONTEND_URL}?error=token_exchange_failed`);
+      return res.redirect(`${redirectBase}?error=token_exchange_failed`);
     }
     
     const { access_token, refresh_token, expires_in } = tokenRes.data;
@@ -124,7 +127,7 @@ async function handleCallback(req, res) {
     });
     
     if (userRes.status !== 200) {
-      return res.redirect(`${process.env.FRONTEND_URL}?error=user_info_failed`);
+      return res.redirect(`${redirectBase}?error=user_info_failed`);
     }
     
     const spotifyUser = userRes.data;
@@ -153,28 +156,30 @@ async function handleCallback(req, res) {
     
     setSessionCookie(res, token);
     const encryptedToken = encryptToken(token);
-    res.redirect(`${process.env.FRONTEND_URL}?token=${encodeURIComponent(encryptedToken)}&loggedin=true`);
+    res.redirect(`${redirectBase}?token=${encodeURIComponent(encryptedToken)}&loggedin=true`);
   } catch {
-    res.redirect(`${process.env.FRONTEND_URL}?error=server_error`);
+    res.redirect(`${redirectBase}?error=server_error`);
   }
 }
 
 async function handleMobileCallback(req, res) {
   const { code, error } = req.query;
   
+  const redirectBase = process.env.MOBILE_URL || process.env.FRONTEND_URL;
+  
   if (error) {
-    return res.status(400).json({ error: "spotify_auth_failed" });
+    return res.redirect(`${redirectBase}?error=spotify_auth_failed`);
   }
   
   if (!code) {
-    return res.status(400).json({ error: "no_code" });
+    return res.redirect(`${redirectBase}?error=no_code`);
   }
   
   try {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
       code,
-      redirect_uri: `${process.env.API_URL || 'http://localhost:3001'}/api/auth/spotify/mobile-callback`
+      redirect_uri: `${process.env.API_URL}/api/auth/spotify/mobile-callback`
     }).toString();
     
     const authString = Buffer.from(
@@ -187,7 +192,7 @@ async function handleMobileCallback(req, res) {
     }, body);
     
     if (tokenRes.status !== 200) {
-      return res.status(400).json({ error: "token_exchange_failed" });
+      return res.redirect(`${redirectBase}?error=token_exchange_failed`);
     }
     
     const { access_token, refresh_token, expires_in } = tokenRes.data;
@@ -197,7 +202,7 @@ async function handleMobileCallback(req, res) {
     });
     
     if (userRes.status !== 200) {
-      return res.status(400).json({ error: "user_info_failed" });
+      return res.redirect(`${redirectBase}?error=user_info_failed`);
     }
     
     const spotifyUser = userRes.data;
@@ -224,12 +229,12 @@ async function handleMobileCallback(req, res) {
     const token = generateToken();
     await sessionRepository.create({ token, userId: user.id, expiresAt: getExpiryDate() });
     
-    res.json({ 
-      user: { id: user.id, username: user.username },
-      token
-    });
+    setSessionCookie(res, token);
+    const encryptedToken = encryptToken(token);
+    // Pass user info directly so app doesn't need to make another API call
+    res.redirect(`${redirectBase}?token=${encodeURIComponent(encryptedToken)}&userId=${user.id}&username=${encodeURIComponent(user.username)}&loggedin=true`);
   } catch {
-    res.status(500).json({ error: "server_error" });
+    res.redirect(`${redirectBase}?error=server_error`);
   }
 }
 
@@ -312,8 +317,11 @@ function getSpotifyAuthUrl(req, res) {
   if (platform === 'native') {
     redirectUri = 'soundswipe://spotify-callback';
   } else {
-    redirectUri = `${process.env.API_URL || 'http://localhost:3001'}/api/auth/spotify/mobile-callback`;
+    // Use callback endpoint that handles redirect properly
+    redirectUri = `${process.env.API_URL}/api/auth/spotify/mobile-callback`;
   }
+  
+  console.log(`[Spotify Auth] Platform: ${platform}, Redirect URI: ${redirectUri}`);
   
   const params = new URLSearchParams({
     client_id: process.env.SPOTIFY_CLIENT_ID,
@@ -322,7 +330,7 @@ function getSpotifyAuthUrl(req, res) {
     scope: scopes.join(" "),
     show_dialog: "true"
   });
-  res.json({ url: `${SPOTIFY_AUTH_URL}?${params.toString()}`, platform });
+  res.json({ url: `${SPOTIFY_AUTH_URL}?${params.toString()}`, platform, redirectUri });
 }
 
 async function refreshToken(req, res) {

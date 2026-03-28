@@ -2,71 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
 import { useAuth, API_URL } from '../context/AuthContext';
 
-export default function SwipeCard({ song, isTop, style }) {
+export default function SwipeCard({ song, isTop, style, previewUrl, isPlaying, onTogglePreview }) {
   const { token } = useAuth();
-  const [previewUrl, setPreviewUrl] = useState(song.previewUrl || null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [coverUrl, setCoverUrl] = useState(song.coverUrl);
-  const [sound, setSound] = useState(null);
 
   useEffect(() => {
-    if (sound) {
-      sound.unloadAsync();
-      setSound(null);
-      setIsPlaying(false);
+    if (song.coverUrl) {
+      setCoverUrl(song.coverUrl);
     }
-    if (song.previewUrl) {
-      setPreviewUrl(song.previewUrl);
-    } else if (token) {
-      fetchPreview();
-    }
-  }, [song.id, song.previewUrl, token]);
-
-  useEffect(() => {
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, [sound]);
-
-  const fetchPreview = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/preview?title=${encodeURIComponent(song.title)}&artist=${encodeURIComponent(song.artist)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.previewUrl) setPreviewUrl(data.previewUrl);
-      if (data.coverUrl && !song.coverUrl) setCoverUrl(data.coverUrl);
-    } catch {}
-  };
-
-  const togglePreview = async () => {
-    if (!previewUrl) return;
-    
-    if (sound) {
-      await sound.unloadAsync();
-      setSound(null);
-    }
-    
-    if (isPlaying) {
-      setIsPlaying(false);
-      return;
-    }
-
-    const { sound: newSound } = await Audio.Sound.createAsync(
-      { uri: previewUrl },
-      { shouldPlay: true },
-      (status) => {
-        if (status.didJustFinish) setIsPlaying(false);
-      }
-    );
-    setSound(newSound);
-    setIsPlaying(true);
-  };
+  }, [song.id, song.coverUrl, token]);
 
   return (
     <View style={[styles.card, style]}>
@@ -106,21 +52,25 @@ export default function SwipeCard({ song, isTop, style }) {
               </View>
             )}
           </View>
-
-          {previewUrl && (
-            <TouchableOpacity style={styles.previewBtn} onPress={togglePreview}>
-              <Ionicons 
-                name={isPlaying ? "pause-circle" : "play-circle"} 
-                size={48} 
-                color="#ff6b6b" 
-              />
-              <Text style={styles.previewText}>
-                {isPlaying ? 'Pause' : '30s Preview'}
-              </Text>
-            </TouchableOpacity>
-          )}
         </View>
       </LinearGradient>
+
+      <View style={styles.previewContainer}>
+        <TouchableOpacity 
+          style={[styles.previewBtn, !previewUrl && styles.previewBtnDisabled]} 
+          onPress={onTogglePreview}
+          disabled={!previewUrl}
+        >
+          <Ionicons 
+            name={isPlaying ? "pause-circle" : "play-circle"} 
+            size={36} 
+            color={previewUrl ? "#ff6b6b" : "rgba(255,107,107,0.3)"} 
+          />
+          <Text style={[styles.previewText, !previewUrl && styles.previewTextDisabled]}>
+            {previewUrl ? (isPlaying ? 'Pause' : '30s Preview') : 'Loading...'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -152,10 +102,10 @@ const styles = StyleSheet.create({
   },
   gradient: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 60,
     left: 0,
     right: 0,
-    height: '60%',
+    height: '55%',
     justifyContent: 'space-between',
   },
   topGradient: {
@@ -172,28 +122,38 @@ const styles = StyleSheet.create({
   },
   genreText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  previewContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    backgroundColor: 'rgba(10,10,10,0.95)',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   previewBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,107,107,0.15)',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    marginTop: 16,
     gap: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,107,107,0.3)',
+  },
+  previewBtnDisabled: {
+    opacity: 0.5,
   },
   previewText: {
     color: '#ff6b6b',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
+  },
+  previewTextDisabled: {
+    color: 'rgba(255,107,107,0.3)',
   },
   content: {
     padding: 24,

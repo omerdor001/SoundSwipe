@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,27 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth, API_URL } from '../context/AuthContext';
 import PlatformModal from '../components/PlatformModal';
 
+function parseDuration(duration) {
+  if (!duration || duration === '?:??') return 0;
+  const parts = duration.split(':');
+  if (parts.length === 2) {
+    const [min, sec] = parts;
+    return (parseInt(min) || 0) * 60 + (parseInt(sec) || 0);
+  }
+  return 0;
+}
+
+function formatTotalTime(totalSeconds) {
+  if (totalSeconds === 0) return '0:00';
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export default function PlaylistScreen() {
   const { logout, token } = useAuth();
   const [songs, setSongs] = useState([]);
@@ -21,6 +42,10 @@ export default function PlaylistScreen() {
   const [search, setSearch] = useState('');
   const [selectedSong, setSelectedSong] = useState(null);
   const [showPlatformModal, setShowPlatformModal] = useState(false);
+
+  const totalDuration = useMemo(() => {
+    return songs.reduce((total, song) => total + parseDuration(song.duration), 0);
+  }, [songs]);
 
   useEffect(() => {
     if (token) fetchPlaylist();
@@ -127,6 +152,10 @@ export default function PlaylistScreen() {
         <View style={styles.statChip}>
           <Text style={styles.statNumber}>{songs.length}</Text>
           <Text style={styles.statLabel}>Songs</Text>
+        </View>
+        <View style={styles.statChip}>
+          <Text style={styles.statNumber}>{formatTotalTime(totalDuration)}</Text>
+          <Text style={styles.statLabel}>Total</Text>
         </View>
       </View>
 

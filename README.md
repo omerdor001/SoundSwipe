@@ -1,10 +1,10 @@
-# 🎵 SoundSwipe
+# SoundSwipe
 
-A Tinder-style music discovery app powered by the **MusicBrainz API** — an open, free music encyclopedia with millions of recordings. Swipe right to save songs, left to skip. Every user has their own account and playlist.
+A Tinder-style music discovery app. Swipe right to save songs, left to skip. Features **Content-Based Filtering** (CBF) recommendations using Last.fm audio features.
 
 ---
 
-## 🗂 Project Structure
+## Project Structure
 
 ```
 soundswipe/
@@ -12,52 +12,43 @@ soundswipe/
 │   ├── prisma/schema.prisma        ← PostgreSQL schema
 │   └── src/
 │       ├── index.js                ← Express entry point
-│       ├── middleware/auth.js      ← JWT auth middleware
-│       ├── services/
-│       │   └── musicbrainz.js      ← MusicBrainz API wrapper + normalizer
-│       └── routes/
-│           ├── auth.js             ← POST /api/auth/login|signup
-│           ├── songs.js            ← GET  /api/songs  (live from MusicBrainz)
-│           ├── swipes.js           ← POST /api/swipes
-│           └── playlist.js         ← GET/DELETE /api/playlist
+│       ├── middleware/auth.js      ← Auth middleware (Bearer + cookies)
+│       ├── handlers/               ← Request handlers
+│       ├── services/               ← Business logic
+│       ├── repositories/           ← Database access
+│       └── routes/                ← API routes
 │
-└── frontend/
+├── frontend/                       ← Web app (Vite + React)
+│   └── src/
+│
+└── mobile/                        ← React Native app (Expo)
     └── src/
-        ├── api/client.js           ← All fetch calls
-        ├── store/useStore.js       ← Zustand state
-        ├── pages/
-        │   ├── LoginScreen.jsx
-        │   └── MainApp.jsx
-        └── components/
-            ├── SwipeView.jsx       ← Swipe cards + search + genre filter
-            ├── SongCard.jsx
-            ├── PlaylistView.jsx
-            ├── MiniPlayer.jsx
-            └── InfoModal.jsx
+        ├── screens/               ← LoginScreen, SwipeScreen, PlaylistScreen
+        ├── components/            ← SwipeCard, PlatformModal
+        └── context/              ← AuthContext
 ```
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Node.js 18+
 - PostgreSQL (local or [Supabase](https://supabase.com) free tier)
+- Expo CLI (`npm install -g expo-cli`)
 
 ### 1. Backend
 
 ```bash
 cd backend
 npm install
-cp .env.example .env        # fill in DATABASE_URL and JWT_SECRET
+cp .env.example .env        # fill in DATABASE_URL, JWT_SECRET, SPOTIFY_*, DEEZER_*, LASTFM_*
 npx prisma generate
 npx prisma migrate dev --name init
 npm run dev                  # starts on :3001
 ```
 
-> **No seed script needed** — songs are fetched live from MusicBrainz!
-
-### 2. Frontend
+### 2. Frontend (Web)
 
 ```bash
 cd frontend
@@ -65,52 +56,69 @@ npm install
 npm run dev                  # starts on :3000, proxies /api → :3001
 ```
 
----
+### 3. Mobile App
 
-## 🎵 How MusicBrainz Integration Works
+```bash
+cd mobile
+npm install
+npx expo start               # starts Expo dev server
+```
 
-Songs are **never pre-loaded** into the database. Instead:
-
-1. When a user opens the Discover tab, the backend queries `musicbrainz.org/ws/2/recording` for a random genre.
-2. Results are **normalized** (title, artist, duration, genre tag → emoji + gradient colors).
-3. Songs the user has already swiped are filtered out server-side.
-4. When a user swipes (either direction), the song is **upserted** into our DB so it can be referenced in swipe and playlist records.
-5. Responses are **cached for 10 minutes** per query to respect MusicBrainz's rate limit (1 req/sec).
-
-### MusicBrainz API details
-- Base URL: `https://musicbrainz.org/ws/2/`
-- **No API key required** — just a `User-Agent` header
-- Rate limit: **1 request/second** (handled in `musicbrainz.js`)
-- Format: `?fmt=json` for JSON responses
-- Key endpoint used: `/recording?query=tag:pop&inc=tags+artist-credits&fmt=json`
+For Android: Press `a` to run on Android emulator/device
+For iOS: Press `i` to run on iOS simulator (Mac only)
+For Web: Press `w` to run in browser
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | POST | `/api/auth/signup` | — | Create account |
 | POST | `/api/auth/login` | — | Sign in, get JWT |
-| GET | `/api/auth/me` | ✅ | Verify token |
-| GET | `/api/songs` | ✅ | Discovery queue from MusicBrainz |
-| GET | `/api/songs?genre=rock` | ✅ | Filter by genre tag |
-| GET | `/api/songs?search=radiohead` | ✅ | Filter by artist/title |
-| GET | `/api/songs/search?q=...` | ✅ | Dedicated search |
-| GET | `/api/songs/genres` | ✅ | List available genres |
-| POST | `/api/swipes` | ✅ | Record swipe `{ song, direction }` |
-| POST | `/api/swipes/reset` | ✅ | Clear all swipes |
-| GET | `/api/playlist` | ✅ | Get liked songs |
-| DELETE | `/api/playlist/:songId` | ✅ | Remove from playlist |
+| GET | `/api/auth/me` | Bearer | Verify token |
+| GET | `/api/auth/spotify` | — | Start Spotify OAuth |
+| GET | `/api/auth/spotify/callback` | — | Spotify OAuth callback |
+| GET | `/api/songs` | Bearer | Discovery queue |
+| GET | `/api/songs?genre=rock` | Bearer | Filter by genre |
+| GET | `/api/songs/search?q=...` | Bearer | Search songs |
+| GET | `/api/songs/similar` | Bearer | CBF similar songs |
+| POST | `/api/swipes` | Bearer | Record swipe `{ song, direction }` |
+| POST | `/api/swipes/reset` | Bearer | Clear all swipes |
+| GET | `/api/playlist` | Bearer | Get liked songs |
+| DELETE | `/api/playlist/:songId` | Bearer | Remove from playlist |
+| GET | `/api/preview` | Bearer | Get preview URL (Deezer/iTunes) |
 
 ---
 
-## 🛠 Tech Stack
+## How It Works
+
+### Music Discovery
+- Songs fetched from **MusicBrainz** API
+- Filtered by genre tags (Pop, Rock, Hip Hop, Electronic, Jazz, Metal, Country, R&B, Indie)
+- Swiped songs saved to database
+
+### Content-Based Filtering (CBF)
+- Uses **Last.fm** to get top tags for liked songs
+- Analyzes tag patterns to find similar songs
+- "Similar" button fetches personalized recommendations
+
+### Preview Playback
+- Uses **Deezer** API for 30-second preview URLs
+- Falls back to **iTunes** Search API if Deezer doesn't have preview
+
+### Platform Links
+- Playlist songs can be opened in: Spotify, Apple Music, YouTube Music, Tidal
+
+---
+
+## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Music data | **MusicBrainz Open API** (free, no key) |
-| Frontend | React 18, Vite, Zustand, CSS Modules |
-| Backend | Node.js, Express |
-| Auth | JWT + bcryptjs |
+| Music Data | MusicBrainz, Last.fm, Deezer, iTunes APIs |
+| Frontend (Web) | React 18, Vite, Zustand, CSS Modules |
+| Mobile App | React Native (Expo), expo-av |
+| Backend | Node.js, Express, Prisma |
+| Auth | JWT + bcryptjs, Spotify OAuth |
 | Database | PostgreSQL via Prisma ORM |
