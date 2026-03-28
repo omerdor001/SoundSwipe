@@ -94,7 +94,7 @@ For Web: Press `w` to run in browser
 ## How It Works
 
 ### Music Discovery
-- Songs fetched from **MusicBrainz** API
+- Songs fetched from **Deezer** API
 - Filtered by genre tags (Pop, Rock, Hip Hop, Electronic, Jazz, Metal, Country, R&B, Indie)
 - Swiped songs saved to database
 
@@ -104,7 +104,7 @@ For Web: Press `w` to run in browser
 - "Similar" button fetches personalized recommendations
 
 ### Preview Playback
-- Uses **Deezer** API for 30-second preview URLs
+- Uses **iTunes APIs** API for 30-second preview URLs
 - Falls back to **iTunes** Search API if Deezer doesn't have preview
 
 ### Platform Links
@@ -116,7 +116,7 @@ For Web: Press `w` to run in browser
 
 | Layer | Technology |
 |-------|-----------|
-| Music Data | MusicBrainz, Last.fm, Deezer, iTunes APIs |
+| Music Data | Last.fm, Deezer, iTunes APIs |
 | Frontend (Web) | React 18, Vite, Zustand, CSS Modules |
 | Mobile App | React Native (Expo), expo-av |
 | Backend | Node.js, Express, Prisma |
