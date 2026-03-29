@@ -316,9 +316,10 @@ function getSpotifyAuthUrl(req, res) {
   let redirectUri;
   if (platform === 'native') {
     redirectUri = 'soundswipe://spotify-callback';
+  } else if (platform === 'mobile') {
+    redirectUri = process.env.SPOTIFY_MOBILE_REDIRECT_URI;
   } else {
-    // Use callback endpoint that handles redirect properly
-    redirectUri = `${process.env.API_URL}/api/auth/spotify/mobile-callback`;
+    redirectUri = process.env.SPOTIFY_REDIRECT_URI;
   }
   
   console.log(`[Spotify Auth] Platform: ${platform}, Redirect URI: ${redirectUri}`);
@@ -373,6 +374,86 @@ async function refreshToken(req, res) {
   }
 }
 
+async function exchangeCode(req, res) {
+  const { code, redirectUri, codeVerifier } = req.body;
+  
+  if (!code) {
+    return res.status(400).json({ error: "Code is required" });
+  }
+  
+  if (!codeVerifier) {
+    return res.status(400).json({ error: "code_verifier required for PKCE" });
+  }
+  
+  try {
+    const body = new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+      client_id: process.env.SPOTIFY_CLIENT_ID,
+      code_verifier: codeVerifier,
+    }).toString();
+    
+    const authString = Buffer.from(
+      `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
+    ).toString("base64");
+    
+    const tokenRes = await httpsPost(SPOTIFY_TOKEN_URL, {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Authorization": `Basic ${authString}`
+    }, body);
+    
+    if (tokenRes.status !== 200) {
+      console.error("[Spotify] Token exchange failed:", tokenRes.data);
+      return res.status(400).json({ error: "Token exchange failed" });
+    }
+    
+    const { access_token, refresh_token, expires_in } = tokenRes.data;
+    
+    const userRes = await httpsGet(`${SPOTIFY_API_URL}/me`, {
+      Authorization: `Bearer ${access_token}`
+    });
+    
+    if (userRes.status !== 200) {
+      return res.status(400).json({ error: "Failed to get user info" });
+    }
+    
+    const spotifyUser = userRes.data;
+    
+    let user = await userRepository.findBySpotifyId(spotifyUser.id);
+    
+    if (!user) {
+      user = await userRepository.create({
+        username: spotifyUser.display_name || spotifyUser.id,
+        password: "",
+        spotifyId: spotifyUser.id,
+        spotifyAccessToken: access_token,
+        spotifyRefreshToken: refresh_token,
+        spotifyTokenExpiry: new Date(Date.now() + expires_in * 1000)
+      });
+    } else {
+      await userRepository.update(user.id, {
+        spotifyAccessToken: access_token,
+        spotifyRefreshToken: refresh_token,
+        spotifyTokenExpiry: new Date(Date.now() + expires_in * 1000)
+      });
+    }
+    
+    const token = generateToken();
+    await sessionRepository.create({ token, userId: user.id, expiresAt: getExpiryDate() });
+    
+    res.json({
+      token,
+      userId: user.id,
+      username: user.username,
+      spotifyId: spotifyUser.id
+    });
+  } catch (e) {
+    console.error("[Spotify] Exchange error:", e);
+    res.status(500).json({ error: "Server error" });
+  }
+}
+
 module.exports = {
   redirectToSpotify,
   handleCallback,
@@ -380,4 +461,5 @@ module.exports = {
   handleNativeCallback,
   getSpotifyAuthUrl,
   refreshToken,
+  exchangeCode,
 };

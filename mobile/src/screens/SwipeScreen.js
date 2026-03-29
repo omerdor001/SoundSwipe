@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,16 +9,14 @@ import {
   ScrollView,
   Modal,
   TextInput,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useAuth, API_URL } from '../context/AuthContext';
-import SwipeCard from '../components/SwipeCard';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH * 0.65;
-const CARD_HEIGHT = SCREEN_HEIGHT * 0.48;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const SEARCH_MODES = [
   { id: 'title', label: 'Title' },
@@ -45,6 +43,8 @@ export default function SwipeScreen() {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [sound, setSound] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const currentSong = songs[currentIndex];
 
@@ -57,16 +57,47 @@ export default function SwipeScreen() {
   }, [sound]);
 
   useEffect(() => {
+    if (token) fetchSongs();
+  }, [token]);
+
+  useEffect(() => {
     if (currentSong && token) {
       setPreviewUrl(null);
       setIsPlaying(false);
+      setPreviewLoading(true);
       if (sound) {
         sound.unloadAsync();
         setSound(null);
       }
       fetchPreview(currentSong);
     }
-  }, [currentIndex, currentSong?.id]);
+  }, [currentIndex, currentSong?.id, token]);
+
+  useEffect(() => {
+    if (!loadingMore && !loading && songs.length > 0 && currentIndex >= songs.length - 3) {
+      fetchMoreSongs();
+    }
+  }, [currentIndex, songs.length]);
+
+  const fetchMoreSongs = async () => {
+    if (loadingMore || loading) return;
+    setLoadingMore(true);
+    try {
+      const url = selectedGenre
+        ? `${API_URL}/api/songs?genre=${selectedGenre.toLowerCase()}&refresh=true`
+        : `${API_URL}/api/songs?refresh=true`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setSongs(data);
+        setCurrentIndex(0);
+      }
+    } catch {}
+    setLoadingMore(false);
+  };
 
   const fetchPreview = async (song) => {
     try {
@@ -74,17 +105,22 @@ export default function SwipeScreen() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
+      setPreviewLoading(false);
       if (data.previewUrl) {
         setPreviewUrl(data.previewUrl);
       }
-    } catch {}
+    } catch {
+      setPreviewLoading(false);
+    }
   };
 
   const togglePreview = async () => {
     if (!previewUrl) return;
     
     if (sound) {
-      await sound.unloadAsync();
+      try {
+        await sound.unloadAsync();
+      } catch {}
       setSound(null);
     }
     
@@ -93,20 +129,22 @@ export default function SwipeScreen() {
       return;
     }
 
-    const { sound: newSound } = await Audio.Sound.createAsync(
-      { uri: previewUrl },
-      { shouldPlay: true },
-      (status) => {
-        if (status.didJustFinish) setIsPlaying(false);
-      }
-    );
-    setSound(newSound);
-    setIsPlaying(true);
+    try {
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: previewUrl },
+        { shouldPlay: true }
+      );
+      newSound.setOnPlaybackStatusUpdate((status) => {
+        if (status.didJustFinish) {
+          setIsPlaying(false);
+        }
+      });
+      setSound(newSound);
+      setIsPlaying(true);
+    } catch (e) {
+      console.log('Audio error:', e);
+    }
   };
-
-  useEffect(() => {
-    if (token) fetchSongs();
-  }, [token]);
 
   const fetchSongs = async (genre = null) => {
     setLoading(true);
@@ -229,18 +267,86 @@ export default function SwipeScreen() {
     setCurrentIndex(prev => prev + 1);
   };
 
-  const renderCards = () => {
-    if (loading) {
+  const renderCard = () => {
+    if (!currentSong) return null;
+    
+    return (
+      <View style={styles.cardSection}>
+        <View style={styles.card}>
+          {currentSong.coverUrl ? (
+            <Image source={{ uri: currentSong.coverUrl }} style={styles.cover} />
+          ) : (
+            <View style={[styles.cover, styles.emojiCover]}>
+              <Text style={styles.emoji}>{currentSong.emoji || '🎵'}</Text>
+            </View>
+          )}
+          
+          <LinearGradient
+            colors={['transparent', 'rgba(10,10,10,0.7)', 'rgba(10,10,10,1)']}
+            style={styles.gradient}
+          >
+            <View style={styles.topGradient}>
+              <View style={styles.genreBadge}>
+                <Text style={styles.genreBadgeText}>{currentSong.genre}</Text>
+              </View>
+            </View>
+
+            <View style={styles.content}>
+              <Text style={styles.title} numberOfLines={2}>
+                {currentSong.title}
+              </Text>
+              <Text style={styles.artist}>{currentSong.artist}</Text>
+              
+              <View style={styles.meta}>
+                <View style={styles.metaItem}>
+                  <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.6)" />
+                  <Text style={styles.metaText}>{currentSong.duration || '?:??'}</Text>
+                </View>
+                {currentSong.bpm && (
+                  <View style={styles.metaItem}>
+                    <Ionicons name="pulse-outline" size={14} color="rgba(255,255,255,0.6)" />
+                    <Text style={styles.metaText}>{currentSong.bpm} BPM</Text>
+                  </View>
+                )}
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.previewBtn, (!previewUrl || previewLoading) && styles.previewBtnDisabled]} 
+                onPress={togglePreview}
+                disabled={!previewUrl || previewLoading}
+              >
+                {previewLoading ? (
+                  <ActivityIndicator size="small" color="#ff6b6b" />
+                ) : (
+                  <Ionicons 
+                    name={isPlaying ? "pause-circle" : "play-circle"} 
+                    size={32} 
+                    color="#ff6b6b" 
+                  />
+                )}
+                <Text style={[styles.previewText, (!previewUrl || previewLoading) && styles.previewTextDisabled]}>
+                  {previewLoading ? 'Loading...' : (isPlaying ? 'Pause' : '30s Preview')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </View>
+      </View>
+    );
+  };
+
+  const renderContent = () => {
+    if (loading && songs.length === 0) {
       return (
-        <View style={styles.centered}>
+        <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#ff6b6b" />
         </View>
       );
     }
 
-    if (error) {
+    if (error && songs.length === 0) {
       return (
-        <View style={styles.centered}>
+        <View style={styles.centerContainer}>
           <Text style={styles.errorIcon}>⚠️</Text>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.resetButton} onPress={logout}>
@@ -250,14 +356,13 @@ export default function SwipeScreen() {
       );
     }
 
-    if (currentIndex >= songs.length) {
+    if (currentIndex >= songs.length && !loadingMore) {
       return (
-        <View style={styles.centered}>
+        <View style={styles.centerContainer}>
           <Text style={styles.doneIcon}>🎵</Text>
           <Text style={styles.doneTitle}>All Done!</Text>
           <Text style={styles.doneText}>
-            You've seen all songs. Check back later!
-          </Text>
+            Tap refresh to load more songs</Text>
           <TouchableOpacity
             style={styles.resetButton}
             onPress={() => fetchSongs(selectedGenre)}
@@ -268,49 +373,90 @@ export default function SwipeScreen() {
       );
     }
 
-    return (
-      <View style={styles.cardContainer}>
-        {songs.slice(currentIndex, currentIndex + 2).map((song, index) => {
-          const isTop = index === 0;
-          return (
-            <SwipeCard
-              key={song.id}
-              song={song}
-              isTop={isTop}
-              onSwipe={handleSwipe}
-              previewUrl={isTop ? previewUrl : null}
-              isPlaying={isTop ? isPlaying : false}
-              onTogglePreview={isTop ? togglePreview : undefined}
-              style={{
-                width: CARD_WIDTH,
-                height: CARD_HEIGHT,
-                zIndex: songs.length - currentIndex - index,
-                transform: [
-                  { scale: isTop ? 1 : 0.95 },
-                  { translateY: isTop ? 0 : 15 },
-                ],
-              }}
-            />
-          );
-        })}
-      </View>
-    );
+    if (loadingMore) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#ff6b6b" />
+          <Text style={styles.loadingMoreText}>Loading more songs...</Text>
+        </View>
+      );
+    }
+
+    return renderCard();
   };
 
   return (
-    <LinearGradient
-      colors={['#1a1a1a', '#0a0a0a']}
-      style={styles.container}
-    >
-      <View style={styles.header}>
-        <Text style={styles.logo}>SoundSwipe</Text>
-        <View style={styles.headerBtns}>
-          <TouchableOpacity onPress={() => setShowSearch(true)} style={styles.headerBtn}>
-            <Ionicons name="search" size={24} color="rgba(255,255,255,0.6)" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={logout} style={styles.headerBtn}>
-            <Ionicons name="log-out-outline" size={24} color="rgba(255,255,255,0.6)" />
-          </TouchableOpacity>
+    <View style={styles.container}>
+      <View style={styles.headerSection}>
+        <View style={styles.header}>
+          <Text style={styles.logo}>SoundSwipe</Text>
+          <View style={styles.headerBtns}>
+            <TouchableOpacity onPress={() => setShowSearch(true)} style={styles.headerBtn}>
+              <Ionicons name="search" size={24} color="rgba(255,255,255,0.6)" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={logout} style={styles.headerBtn}>
+              <Ionicons name="log-out-outline" size={24} color="rgba(255,255,255,0.6)" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.genreSection}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.genreContainer}
+          >
+            <TouchableOpacity
+              style={[
+                styles.genreChip,
+                styles.genreChipSpecial,
+                selectedGenre === null && !loadingSimilar && styles.genreChipActive,
+              ]}
+              onPress={() => fetchSongs(null)}
+            >
+              <Text style={[styles.genreChipText, selectedGenre === null && !loadingSimilar && styles.genreChipTextActive]}>
+                All
+              </Text>
+            </TouchableOpacity>
+
+            {genres.map((genre) => (
+              <TouchableOpacity
+                key={genre}
+                style={[
+                  styles.genreChip,
+                  selectedGenre === genre && styles.genreChipActive,
+                ]}
+                onPress={() => fetchSongs(genre)}
+              >
+                <Text
+                  style={[
+                    styles.genreChipText,
+                    selectedGenre === genre && styles.genreChipTextActive,
+                  ]}
+                >
+                  {genre}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity
+              style={[
+                styles.genreChip,
+                styles.genreChipSpecial,
+                loadingSimilar && styles.genreChipActive,
+              ]}
+              onPress={fetchSimilar}
+              disabled={loadingSimilar}
+            >
+              {loadingSimilar ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={[styles.genreChipText, styles.genreChipTextSpecial]}>
+                  ✨ Similar
+                </Text>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </View>
 
@@ -372,92 +518,42 @@ export default function SwipeScreen() {
         </View>
       </Modal>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.genreScroll}
-        contentContainerStyle={styles.genreContainer}
-      >
-        <TouchableOpacity
-          style={[
-            styles.genreChip,
-            styles.genreChipSpecial,
-            selectedGenre === null && !loadingSimilar && styles.genreChipActive,
-          ]}
-          onPress={() => fetchSongs(null)}
-        >
-          <Text style={[styles.genreText, selectedGenre === null && !loadingSimilar && styles.genreTextActive]}>
-            All
-          </Text>
-        </TouchableOpacity>
+      {renderContent()}
 
-        {genres.map((genre) => (
-          <TouchableOpacity
-            key={genre}
-            style={[
-              styles.genreChip,
-              selectedGenre === genre && styles.genreChipActive,
-            ]}
-            onPress={() => fetchSongs(genre)}
-          >
-            <Text
-              style={[
-                styles.genreText,
-                selectedGenre === genre && styles.genreTextActive,
-              ]}
+      {currentSong && currentIndex < songs.length && (
+        <View style={styles.controlsSection}>
+          <View style={styles.controls}>
+            <TouchableOpacity
+              style={[styles.controlBtn, styles.controlNo]}
+              onPress={() => handleSwipe('left')}
             >
-              {genre}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Ionicons name="close" size={32} color="#ff4757" />
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.genreChip,
-            styles.genreChipSpecial,
-            loadingSimilar && styles.genreChipActive,
-          ]}
-          onPress={fetchSimilar}
-          disabled={loadingSimilar}
-        >
-          {loadingSimilar ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={[styles.genreText, styles.genreTextSpecial]}>
-              ✨ Similar
-            </Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
+            <TouchableOpacity
+              style={[styles.controlBtn, styles.controlYes]}
+              onPress={() => handleSwipe('right')}
+            >
+              <Ionicons name="heart" size={36} color="#fff" />
+            </TouchableOpacity>
+          </View>
 
-      {renderCards()}
-
-      <View style={styles.controls}>
-        <TouchableOpacity
-          style={[styles.controlBtn, styles.controlNo]}
-          onPress={() => handleSwipe('left')}
-        >
-          <Ionicons name="close" size={32} color="#ff4757" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.controlBtn, styles.controlYes]}
-          onPress={() => handleSwipe('right')}
-        >
-          <Ionicons name="heart" size={36} color="#fff" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.hints}>
-        <Text style={styles.hint}>← Skip  |  Like →</Text>
-      </View>
-    </LinearGradient>
+          <View style={styles.hints}>
+            <Text style={styles.hint}>← Skip  |  Like →</Text>
+          </View>
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0a0a0a',
+  },
+  headerSection: {
+    backgroundColor: '#0a0a0a',
   },
   header: {
     flexDirection: 'row',
@@ -465,7 +561,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 50,
-    paddingBottom: 10,
+    paddingBottom: 15,
   },
   logo: {
     fontSize: 28,
@@ -479,6 +575,241 @@ const styles = StyleSheet.create({
   },
   headerBtn: {
     padding: 8,
+  },
+  genreSection: {
+    paddingBottom: 10,
+  },
+  genreContainer: {
+    paddingHorizontal: 20,
+    gap: 10,
+    flexDirection: 'row',
+  },
+  genreChip: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,107,107,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,107,0.3)',
+  },
+  genreChipActive: {
+    backgroundColor: '#ff6b6b',
+    borderColor: '#ff6b6b',
+  },
+  genreChipSpecial: {
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    borderColor: 'rgba(255,215,0,0.4)',
+  },
+  genreChipText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  genreChipTextActive: {
+    color: '#fff',
+  },
+  genreChipTextSpecial: {
+    color: '#ffd700',
+  },
+  cardSection: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  card: {
+    width: SCREEN_WIDTH * 0.8,
+    height: SCREEN_WIDTH * 1.1,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#151515',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
+    elevation: 8,
+  },
+  cover: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  emojiCover: {
+    backgroundColor: '#1f1f1f',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emoji: {
+    fontSize: 80,
+  },
+  gradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '65%',
+    justifyContent: 'space-between',
+  },
+  topGradient: {
+    paddingTop: 16,
+    paddingHorizontal: 16,
+  },
+  genreBadge: {
+    backgroundColor: 'rgba(255,107,107,0.9)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  genreBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  content: {
+    padding: 16,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  artist: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 12,
+  },
+  meta: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+  },
+  previewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,107,107,0.2)',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,107,0.4)',
+  },
+  previewBtnDisabled: {
+    opacity: 0.5,
+    borderColor: 'rgba(255,107,107,0.2)',
+  },
+  previewText: {
+    color: '#ff6b6b',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  previewTextDisabled: {
+    color: 'rgba(255,107,107,0.5)',
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 100,
+  },
+  doneIcon: {
+    fontSize: 80,
+    marginBottom: 20,
+  },
+  doneTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 10,
+  },
+  doneText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 15,
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  loadingMoreText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
+    marginTop: 15,
+  },
+  errorIcon: {
+    fontSize: 60,
+    marginBottom: 20,
+  },
+  errorText: {
+    color: '#ff4757',
+    fontSize: 15,
+    textAlign: 'center',
+    marginBottom: 30,
+    paddingHorizontal: 20,
+  },
+  resetButton: {
+    backgroundColor: '#ff6b6b',
+    paddingHorizontal: 40,
+    paddingVertical: 16,
+    borderRadius: 30,
+  },
+  resetText: {
+    color: '#fff',
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+  controlsSection: {
+    backgroundColor: '#0a0a0a',
+    paddingBottom: 30,
+  },
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 40,
+    paddingVertical: 15,
+  },
+  controlBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  controlNo: {
+    backgroundColor: 'rgba(255,71,87,0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,71,87,0.5)',
+  },
+  controlYes: {
+    backgroundColor: '#00d26a',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+  },
+  hints: {
+    alignItems: 'center',
+    paddingBottom: 10,
+  },
+  hint: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 12,
+    letterSpacing: 1,
   },
   modalOverlay: {
     flex: 1,
@@ -547,130 +878,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 1,
-  },
-  genreScroll: {
-    maxHeight: 50,
-  },
-  genreContainer: {
-    paddingHorizontal: 20,
-    gap: 10,
-    flexDirection: 'row',
-  },
-  genreChip: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255,107,107,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,107,107,0.3)',
-  },
-  genreChipActive: {
-    backgroundColor: '#ff6b6b',
-    borderColor: '#ff6b6b',
-  },
-  genreChipSpecial: {
-    backgroundColor: 'rgba(255,215,0,0.15)',
-    borderColor: 'rgba(255,215,0,0.4)',
-  },
-  genreText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  genreTextActive: {
-    color: '#fff',
-  },
-  genreTextSpecial: {
-    color: '#ffd700',
-  },
-  cardContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 60,
-  },
-  doneIcon: {
-    fontSize: 80,
-    marginBottom: 20,
-  },
-  doneTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 10,
-  },
-  doneText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 15,
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  errorIcon: {
-    fontSize: 60,
-    marginBottom: 20,
-  },
-  errorText: {
-    color: '#ff4757',
-    fontSize: 15,
-    textAlign: 'center',
-    marginBottom: 30,
-    paddingHorizontal: 20,
-  },
-  resetButton: {
-    backgroundColor: '#ff6b6b',
-    paddingHorizontal: 40,
-    paddingVertical: 16,
-    borderRadius: 30,
-  },
-  resetText: {
-    color: '#fff',
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  controls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 30,
-    paddingVertical: 20,
-    paddingBottom: 30,
-  },
-  controlBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  controlNo: {
-    backgroundColor: 'rgba(255,71,87,0.2)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,71,87,0.5)',
-  },
-  controlYes: {
-    backgroundColor: '#00d26a',
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-  },
-  hints: {
-    alignItems: 'center',
-    paddingBottom: 100,
-  },
-  hint: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 12,
     letterSpacing: 1,
   },
 });

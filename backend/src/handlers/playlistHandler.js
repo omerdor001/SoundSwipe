@@ -5,8 +5,10 @@ const swipeRepository = require("../repositories/swipeRepository");
 async function getPlaylist(req, res) {
   try {
     const entries = await playlistRepository.findByUser(req.user.id);
+    console.log(`[Playlist] User ${req.user.id} has ${entries.length} songs`);
     res.json(entries.map((e) => e.song));
-  } catch {
+  } catch (e) {
+    console.error("[Playlist] Error:", e);
     res.status(500).json({ error: "Server error" });
   }
 }

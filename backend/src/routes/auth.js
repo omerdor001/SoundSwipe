@@ -1,7 +1,7 @@
 // src/routes/auth.js
 const express = require("express");
 const { signup, login, getMe, logout } = require("../handlers/authHandler");
-const { redirectToSpotify, handleCallback, handleMobileCallback, handleNativeCallback, getSpotifyAuthUrl, refreshToken } = require("../handlers/spotifyHandler");
+const { redirectToSpotify, handleCallback, handleMobileCallback, handleNativeCallback, getSpotifyAuthUrl, refreshToken, exchangeCode } = require("../handlers/spotifyHandler");
 const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
@@ -16,6 +16,7 @@ router.get("/spotify/callback", handleCallback);
 router.get("/spotify/mobile-callback", handleMobileCallback);
 router.get("/spotify/native-callback", handleNativeCallback);
 router.get("/spotify/auth-url", getSpotifyAuthUrl);
+router.post("/spotify/exchange", exchangeCode);
 router.post("/spotify/refresh", authMiddleware, refreshToken);
 
 module.exports = router;

@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 
@@ -55,58 +54,31 @@ function AppNavigator() {
   const { user, loading, refreshKey, loginWithToken } = useAuth();
 
   useEffect(() => {
-    // Check for token in URL params (from Spotify callback)
-    const checkUrlParams = () => {
-      const params = new URLSearchParams(window.location.search);
-      const token = params.get('token');
-      const loggedin = params.get('loggedin');
-      const error = params.get('error');
+    const handleUrl = async ({ url }) => {
+      if (!url) return;
       
-      if (loggedin === 'true' && token) {
-        const userId = params.get('userId');
-        const username = params.get('username');
+      try {
+        const parsed = Linking.parse(url);
         
-        if (userId) {
-          console.log('Spotify login success, logging in user:', username);
-          loginWithToken({ id: userId, username: username || '' }, token);
-        }
-        
-        // Clear URL params
-        window.history.replaceState({}, '', window.location.pathname);
-      }
-    };
-    
-    checkUrlParams();
-    
-    // Listen for URL changes
-    const handleUrl = (event) => {
-      const { url } = event;
-      if (url) {
-        try {
-          const urlObj = new URL(url);
-          if (urlObj.searchParams.get('loggedin') === 'true' && urlObj.searchParams.get('token')) {
-            checkUrlParams();
+        if (parsed.queryParams?.loggedin === 'true' && parsed.queryParams?.token) {
+          const userId = parsed.queryParams.userId;
+          const username = parsed.queryParams.username;
+          const token = parsed.queryParams.token;
+          
+          if (userId && token) {
+            await loginWithToken({ id: userId, username: username || '' }, token);
           }
-        } catch (e) {}
+        }
+      } catch (e) {
+        console.log('URL parse error:', e);
       }
     };
 
     Linking.addEventListener('url', handleUrl);
     
     Linking.getInitialURL().then(url => {
-      if (url) {
-        try {
-          const urlObj = new URL(url);
-          if (urlObj.searchParams.get('loggedin') === 'true') {
-            checkUrlParams();
-          }
-        } catch (e) {}
-      }
+      if (url) handleUrl({ url });
     });
-
-    return () => {
-      Linking.removeEventListener('url', handleUrl);
-    };
   }, [loginWithToken]);
 
   if (loading) {
@@ -118,25 +90,23 @@ function AppNavigator() {
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <NavigationContainer
-          theme={{
-            dark: true,
-            colors: {
-              primary: '#ff6b6b',
-              background: '#0a0a0a',
-              card: '#151515',
-              text: '#ffffff',
-              border: 'rgba(255,255,255,0.08)',
-              notification: '#ff6b6b',
-            },
-          }}
-        >
-          <StatusBar style="light" />
-          <AppNavigator />
-        </NavigationContainer>
-      </AuthProvider>
-    </GestureHandlerRootView>
+    <AuthProvider>
+      <NavigationContainer
+        theme={{
+          dark: true,
+          colors: {
+            primary: '#ff6b6b',
+            background: '#0a0a0a',
+            card: '#151515',
+            text: '#ffffff',
+            border: 'rgba(255,255,255,0.08)',
+            notification: '#ff6b6b',
+          },
+        }}
+      >
+        <StatusBar style="light" />
+        <AppNavigator />
+      </NavigationContainer>
+    </AuthProvider>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri, useAuthRequest, ResponseType } from 'expo-auth-session';
 import { useAuth, API_URL } from '../context/AuthContext';
+
+WebBrowser.maybeCompleteAuthSession();
+
+const discovery = {
+  authorizationEndpoint: 'https://accounts.spotify.com/authorize',
+  tokenEndpoint: 'https://accounts.spotify.com/api/token',
+};
 
 export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true);
@@ -20,7 +29,58 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [spotifyLoading, setSpotifyLoading] = useState(false);
-  const { login, signup } = useAuth();
+  const { login, signup, loginWithToken } = useAuth();
+
+  const redirectUri = makeRedirectUri({
+    scheme: 'soundswipe',
+    path: 'spotify-callback',
+  });
+
+  const [request, response, promptAsync] = useAuthRequest(
+    {
+      responseType: ResponseType.Code,
+      clientId: '50750d50b93e42a8913a3e691226e906',
+      scopes: ['user-read-private', 'user-read-email'],
+      redirectUri,
+    },
+    discovery
+  );
+
+  useEffect(() => {
+    const handleSpotifyResponse = async () => {
+      if (response?.type === 'success') {
+        const { code } = response.params;
+        const codeVerifier = request?.codeVerifier;
+        
+        try {
+          const res = await fetch(`${API_URL}/api/auth/spotify/exchange`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, redirectUri, codeVerifier }),
+          });
+          
+          const data = await res.json();
+          
+          if (res.ok && data.token) {
+            await loginWithToken(
+              { id: data.userId, username: data.username || '', spotifyId: data.spotifyId },
+              data.token
+            );
+          } else {
+            setError(data.error || 'Spotify login failed');
+          }
+        } catch (err) {
+          setError('Connection failed. Check your network.');
+        }
+        setSpotifyLoading(false);
+      } else if (response?.type === 'error') {
+        setError('Spotify login was cancelled');
+        setSpotifyLoading(false);
+      }
+    };
+    
+    handleSpotifyResponse();
+  }, [response]);
 
   const handleSubmit = async () => {
     if (!username || !password) {
@@ -56,16 +116,8 @@ export default function LoginScreen() {
   const handleSpotifyLogin = async () => {
     setError('');
     setSpotifyLoading(true);
-    
     try {
-      const res = await fetch(`${API_URL}/api/auth/spotify/auth-url?platform=web`);
-      const data = await res.json();
-      
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        setError('Spotify login failed');
-      }
+      await promptAsync();
     } catch (err) {
       setError('Spotify login failed. Please try again.');
     }
@@ -174,9 +226,9 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.spotifyButton, spotifyLoading && styles.buttonDisabled]}
+            style={[styles.spotifyButton, (spotifyLoading || !request) && styles.buttonDisabled]}
             onPress={handleSpotifyLogin}
-            disabled={spotifyLoading}
+            disabled={spotifyLoading || !request}
           >
             {spotifyLoading ? (
               <ActivityIndicator color="#fff" />

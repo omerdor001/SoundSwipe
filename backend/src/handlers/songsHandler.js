@@ -52,40 +52,57 @@ async function enrichWithLastFmFeatures(songs, genre = null) {
 async function getSongs(req, res) {
   try {
     const genre = req.query.genre;
+    const forceRefresh = req.query.refresh === 'true';
 
-    const swipedRows = await swipeRepository.findByUser(req.user.id, {
+    // Only filter out songs that were LIKED (swiped right)
+    const likedRows = await swipeRepository.findByUser(req.user.id, {
+      where: { direction: "right" },
       select: { songId: true }
     });
-    const swipedIds = new Set(swipedRows.map(r => r.songId));
+    const likedIds = new Set(likedRows.map(r => r.songId));
 
     let songs;
-
     const target = genre || pickRandomGenre();
     const cacheKey = `deezer:genre:${target}:${req.user.id}`;
-    songs = getCached(cacheKey);
 
-    if (!songs) {
-      try {
-        songs = await searchByGenre(target, 50);
-      } catch {
-        songs = [];
-      }
-      
-      songs = await enrichWithLastFmFeatures(songs, target);
-      setCache(cacheKey, songs);
+    if (forceRefresh) {
+      cache.delete(cacheKey);
     }
 
-    let unseen = songs.filter(s => !swipedIds.has(s.id));
+    if (!getCached(cacheKey)) {
+      try {
+        songs = await searchByGenre(target, 50);
+        songs = await enrichWithLastFmFeatures(songs, target);
+        setCache(cacheKey, songs);
+      } catch (e) {
+        console.error("Deezer search error:", e);
+        songs = [];
+      }
+    } else {
+      songs = getCached(cacheKey);
+    }
 
-    if (unseen.length === 0) {
-      return res.json([]);
+    let unseen = songs.filter(s => !likedIds.has(s.id));
+
+    if (unseen.length < 5) {
+      cache.delete(cacheKey);
+      try {
+        songs = await searchByGenre(target, 50);
+        songs = await enrichWithLastFmFeatures(songs, target);
+        setCache(cacheKey, songs);
+        unseen = songs.filter(s => !likedIds.has(s.id));
+      } catch (e) {
+        console.error("Deezer refresh error:", e);
+        unseen = [];
+      }
     }
 
     const tasteProfile = await buildTasteProfile(req.user.id);
     const ranked = rankBySimilarity(unseen, tasteProfile);
 
     res.json(ranked);
-  } catch {
+  } catch (e) {
+    console.error("getSongs error:", e);
     res.status(500).json({ error: "Failed to fetch songs" });
   }
 }
@@ -136,77 +153,82 @@ async function getGenres(req, res) {
 async function getSimilarSongs(req, res) {
   try {
     const { limit = 20 } = req.query;
-    const cacheKey = `similar:${req.user.id}:${limit}`;
     
-    let songs = getCached(cacheKey);
+    // Get all liked songs with their titles and artists for filtering
+    const likedSongs = await swipeRepository.findByUser(req.user.id, {
+      where: { direction: "right" },
+      include: { song: true }
+    });
     
-    if (!songs) {
-      const likedSwipes = await swipeRepository.findByUser(req.user.id, {
-        where: { direction: "right" },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-        include: { song: true }
-      });
-      
-      if (likedSwipes.length === 0) {
-        return res.json([]);
-      }
-      
-      const similarTracks = new Map();
-      
-      for (const swipe of likedSwipes) {
-        const song = swipe.song;
-        try {
-          const similar = await getSimilarTracks(song.artist, song.title, 10);
-          
-          for (const track of similar) {
-            if (!similarTracks.has(track.title + track.artist)) {
-              similarTracks.set(track.title + track.artist, {
-                title: track.title,
-                artist: track.artist,
-                match: track.match,
-                sourceSong: song.title,
-                genre: song.genre,
-              });
-            }
-          }
-        } catch {}
-      }
-      
-      const tracksArray = Array.from(similarTracks.values())
-        .sort((a, b) => b.match - a.match)
-        .slice(0, parseInt(limit));
-      
-      const trackInfos = await Promise.all(
-        tracksArray.map(t => getTrackInfo(t.artist, t.title))
-      );
-      
-      songs = tracksArray.map((track, idx) => {
-        const info = trackInfos[idx];
-        return {
-          id: `similar_${Buffer.from(`${track.title}|${track.artist}`).toString("base64")}`,
-          title: track.title,
-          artist: track.artist,
-          genre: track.genre || "Unknown",
-          bpm: null,
-          duration: info?.duration || "?:??",
-          emoji: "🎵",
-          color: "#0d0d1a",
-          color2: "#1a1a33",
-          desc: `${track.title} by ${track.artist}. Similar to "${track.sourceSong}".`,
-          coverUrl: null,
-          previewUrl: null,
-          features: { energy: null, danceability: null, valence: null, tempo: null, acousticness: null, instrumentalness: null, speechiness: null },
-        };
-      });
-      
-      songs = await enrichWithLastFmFeatures(songs);
-      
-      setCache(cacheKey, songs);
+    // Create a set of liked song titles+artists (case-insensitive)
+    const likedSongKeys = new Set(
+      likedSongs
+        .filter(s => s.song)
+        .map(s => `${s.song.title}|${s.song.artist}`.toLowerCase())
+    );
+    
+    const likedSwipes = likedSongs.slice(0, 5);
+    
+    if (likedSwipes.length === 0 || !likedSwipes.some(s => s.song)) {
+      return res.json([]);
     }
     
+    const similarTracks = new Map();
+    
+    for (const swipe of likedSwipes) {
+      const song = swipe.song;
+      if (!song) continue;
+      try {
+        const similar = await getSimilarTracks(song.artist, song.title, 10);
+        
+        for (const track of similar) {
+          const trackKey = `${track.title}|${track.artist}`.toLowerCase();
+          // Skip if we already have this track or if user already liked it
+          if (!similarTracks.has(trackKey) && !likedSongKeys.has(trackKey)) {
+            similarTracks.set(trackKey, {
+              title: track.title,
+              artist: track.artist,
+              match: track.match,
+              sourceSong: song.title,
+              genre: song.genre,
+            });
+          }
+        }
+      } catch {}
+    }
+    
+    let tracksArray = Array.from(similarTracks.values())
+      .sort((a, b) => b.match - a.match)
+      .slice(0, parseInt(limit));
+    
+    const trackInfos = await Promise.all(
+      tracksArray.map(t => getTrackInfo(t.artist, t.title))
+    );
+    
+    songs = tracksArray.map((track, idx) => {
+      const info = trackInfos[idx];
+      return {
+        id: `similar_${Buffer.from(`${track.title}|${track.artist}`).toString("base64")}`,
+        title: track.title,
+        artist: track.artist,
+        genre: track.genre || "Unknown",
+        bpm: null,
+        duration: info?.duration || "?:??",
+        emoji: "🎵",
+        color: "#0d0d1a",
+        color2: "#1a1a33",
+        desc: `Similar to ${track.sourceSong}`,
+        coverUrl: null,
+        previewUrl: null,
+        features: null,
+      };
+    });
+    
+    songs = await enrichWithLastFmFeatures(songs);
+    
     res.json(songs);
-  } catch {
+  } catch (e) {
+    console.error("getSimilarSongs error:", e);
     res.status(500).json({ error: "Failed to fetch similar songs" });
   }
 }

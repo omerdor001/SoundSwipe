@@ -25,10 +25,15 @@
               "scheme": "soundswipe"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
-    "sdkVersion": "52.0.0"
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }

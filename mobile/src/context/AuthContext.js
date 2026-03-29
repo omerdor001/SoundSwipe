@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 
 const AuthContext = createContext(null);
 
@@ -7,17 +7,17 @@ const API_URL = 'http://10.0.0.3:3001';
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const storageRef = useRef({});
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('ss_user');
-    const savedToken = localStorage.getItem('ss_token');
+    const savedUser = storageRef.current.ss_user;
+    const savedToken = storageRef.current.ss_token;
     if (savedUser && savedToken) {
-      setUser(JSON.parse(savedUser));
+      setUser(savedUser);
       setToken(savedToken);
     }
-    setLoading(false);
   }, []);
 
   const login = useCallback(async (username, password) => {
@@ -30,8 +30,8 @@ export function AuthProvider({ children }) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
     
-    localStorage.setItem('ss_user', JSON.stringify(data.user));
-    localStorage.setItem('ss_token', data.token);
+    storageRef.current.ss_user = data.user;
+    storageRef.current.ss_token = data.token;
     setUser(data.user);
     setToken(data.token);
     setRefreshKey(k => k + 1);
@@ -48,8 +48,8 @@ export function AuthProvider({ children }) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
     
-    localStorage.setItem('ss_user', JSON.stringify(data.user));
-    localStorage.setItem('ss_token', data.token);
+    storageRef.current.ss_user = data.user;
+    storageRef.current.ss_token = data.token;
     setUser(data.user);
     setToken(data.token);
     setRefreshKey(k => k + 1);
@@ -64,15 +64,15 @@ export function AuthProvider({ children }) {
         credentials: 'include',
       });
     } catch {}
-    localStorage.removeItem('ss_user');
-    localStorage.removeItem('ss_token');
+    delete storageRef.current.ss_user;
+    delete storageRef.current.ss_token;
     setUser(null);
     setToken(null);
   }, []);
 
-  const loginWithToken = useCallback((userData, authToken) => {
-    localStorage.setItem('ss_user', JSON.stringify(userData));
-    localStorage.setItem('ss_token', authToken);
+  const loginWithToken = useCallback(async (userData, authToken) => {
+    storageRef.current.ss_user = userData;
+    storageRef.current.ss_token = authToken;
     setUser(userData);
     setToken(authToken);
     setRefreshKey(k => k + 1);

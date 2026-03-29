@@ -2,6 +2,7 @@
 const https = require("https");
 const LASTFM_API = "https://ws.audioscrobbler.com/2.0/";
 const LASTFM_API_KEY = process.env.LASTFM_API_KEY || "";
+const ITUNES_API = "https://itunes.apple.com";
 
 // Audio feature mappings from Last.fm tags (approximate)
 const TAG_TO_FEATURE = {
@@ -201,12 +202,19 @@ async function getTrackInfo(artist, track) {
     const res = await httpsGet(url);
     
     if (res.status === 200 && res.data?.track) {
-      return {
-        duration: res.data.track.duration ? msToMinSec(parseInt(res.data.track.duration)) : null,
-        tags: res.data.track.toptags?.tag || [],
-      };
+      if (res.data.track.duration) {
+        return {
+          duration: msToMinSec(parseInt(res.data.track.duration)),
+          tags: res.data.track.toptags?.tag || [],
+        };
+      }
     }
   } catch (err) {
+  }
+  
+  const iTunesInfo = await searchITunes(artist, track);
+  if (iTunesInfo?.duration) {
+    return { duration: iTunesInfo.duration, tags: [] };
   }
   
   return null;
@@ -218,6 +226,22 @@ function msToMinSec(ms) {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+async function searchITunes(artist, track) {
+  const url = `${ITUNES_API}/search?q=${encodeURIComponent(artist + " " + track)}&media=music&limit=1`;
+  
+  try {
+    const res = await httpsGet(url);
+    if (res.status === 200 && res.data?.results?.[0]?.trackTimeMillis) {
+      return {
+        duration: msToMinSec(res.data.results[0].trackTimeMillis),
+      };
+    }
+  } catch (err) {
+  }
+  
+  return null;
 }
 
 module.exports = {

@@ -21,6 +21,8 @@ async function createSwipe(req, res) {
   }
 
   try {
+    console.log(`[Swipe] User ${req.user.id} swiped ${direction} on song ${song.id}: "${song.title}"`);
+
     await songRepository.upsert({
       id: song.id,
       title: song.title,
@@ -41,13 +43,16 @@ async function createSwipe(req, res) {
     const swipe = await swipeRepository.upsert(req.user.id, song.id, direction);
 
     if (direction === "right") {
+      console.log(`[Playlist] Adding song ${song.id} to playlist for user ${req.user.id}`);
       await playlistRepository.upsert(req.user.id, song.id);
+      console.log(`[Playlist] Song added successfully`);
     } else {
       await playlistRepository.deleteByUserAndSong(req.user.id, song.id);
     }
 
     res.json({ swipe });
-  } catch {
+  } catch (e) {
+    console.error("[Swipe] Error:", e);
     res.status(500).json({ error: "Server error" });
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth, API_URL } from '../context/AuthContext';
 import PlatformModal from '../components/PlatformModal';
 
@@ -47,9 +48,11 @@ export default function PlaylistScreen() {
     return songs.reduce((total, song) => total + parseDuration(song.duration), 0);
   }, [songs]);
 
-  useEffect(() => {
-    if (token) fetchPlaylist();
-  }, [token]);
+  useFocusEffect(
+    useCallback(() => {
+      if (token) fetchPlaylist();
+    }, [token])
+  );
 
   const fetchPlaylist = async () => {
     setLoading(true);
@@ -84,7 +87,6 @@ export default function PlaylistScreen() {
       });
       setSongs(prev => prev.filter(s => s.id !== songId));
     } catch (err) {
-      console.log('Failed to remove song');
     }
   };
 

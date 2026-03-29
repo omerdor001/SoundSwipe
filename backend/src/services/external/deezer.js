@@ -172,7 +172,32 @@ async function getAvailableGenres() {
   ];
 }
 
+function msToDuration(ms) {
+  if (!ms) return "?:??";
+  const totalSec = Math.round(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+async function searchTrack(artist, title) {
+  const url = `${DEEZER_API}/search?q=${encodeURIComponent(artist + " " + title)}&limit=1`;
+  
+  try {
+    const res = await httpsGet(url);
+    if (res.status === 200 && res.data?.data?.[0]) {
+      return {
+        duration: msToDuration(res.data.data[0].duration * 1000),
+      };
+    }
+  } catch (err) {
+  }
+  
+  return null;
+}
+
 module.exports = {
   searchByGenre,
   getAvailableGenres,
+  searchTrack,
 };
